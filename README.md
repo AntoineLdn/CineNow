@@ -2,14 +2,9 @@
 
 **Application de recommandation de films basée sur l'humeur et la météo**
 
-Projet de Programmation Répartie - Rust | R5.A.08  
-Info3-TP1K
+Projet de Programmation Répartie - Rust
 
 ## 👥 Équipe
-
-- Albin CANALS
-- Léo NOAILLES
-- Abel CHAREYRON
 - Antoine LANDON
 
 ---
