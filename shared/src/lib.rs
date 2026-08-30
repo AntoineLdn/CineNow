@@ -19,6 +19,44 @@ pub struct MovieCatalog {
     pub total: usize,
 }
 
+/// Version allégée de `Movie` transportée sur MQTT.
+/// On omet `overview` (récupéré à la demande via HTTP /movie/:id) et on ne
+/// garde que le suffixe du poster (le préfixe TMDb est reconstruit côté UI),
+/// pour réduire fortement la taille du payload et rester sous la limite du broker.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MovieLite {
+    pub id: u32,
+    pub title: String,
+    pub genres: Vec<String>,
+    pub rating: f32,
+    /// Suffixe TMDb uniquement, ex. "/abc123.jpg" (sans le préfixe d'URL).
+    pub poster: Option<String>,
+    pub release_date: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MovieCatalogLite {
+    pub movies: Vec<MovieLite>,
+    pub total: usize,
+}
+
+impl MovieLite {
+    /// Reconstitue un `Movie` complet à partir du DTO.
+    /// `overview` est vide (non transporté) et le poster reste sous forme de
+    /// suffixe : le préfixe d'URL est ajouté par l'UI au moment de l'affichage.
+    pub fn into_movie(self) -> Movie {
+        Movie {
+            id: self.id,
+            title: self.title,
+            genres: self.genres,
+            rating: self.rating,
+            poster_path: self.poster,
+            overview: String::new(),
+            release_date: self.release_date,
+        }
+    }
+}
+
 // Matrice et familles météo chargées depuis des fichiers de données,
 // embarqués dans le binaire à la compilation.
 const AFFINITIES_TOML: &str = include_str!("data/affinities.toml");

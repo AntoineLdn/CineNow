@@ -8,7 +8,7 @@ use axum::{
 use dotenvy::dotenv;
 use rumqttc::{AsyncClient, MqttOptions, Packet, QoS};
 use serde::{Deserialize, Serialize};
-use shared::{Movie, MovieCatalog};
+use shared::{Movie, MovieCatalogLite};
 use std::{collections::HashMap, env, sync::Arc, time::Duration};
 use tokio::sync::Mutex;
 use tower_http::cors::{Any, CorsLayer};
@@ -107,24 +107,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         loop {
             match eventloop.poll().await {
                 Ok(rumqttc::Event::Incoming(Packet::Publish(msg))) => {
-                    let payload = String::from_utf8_lossy(&msg.payload);
-
                     if msg.topic == "weather/current" {
-                        if let Ok(data) = serde_json::from_str::<WeatherData>(&payload) {
+                        // JSON (petit payload)
+                        if let Ok(data) = serde_json::from_slice::<WeatherData>(&msg.payload) {
                             *weather_clone.lock().await = data;
                             println!("Météo mise à jour");
                         }
                     } else if msg.topic.starts_with("movies/") {
-                        if let Ok(catalog) = serde_json::from_str::<MovieCatalog>(&payload) {
+                        // Binaire (bincode) + DTO allégé, reconstruit en Movie complet.
+                        // Le poster reste un suffixe : l'UI ajoute le préfixe TMDb.
+                        if let Ok(catalog) = bincode::deserialize::<MovieCatalogLite>(&msg.payload)
+                        {
                             let genre = msg.topic.replace("movies/", "");
-                            movies_clone
-                                .lock()
-                                .await
-                                .insert(genre.clone(), catalog.movies);
+                            let movies: Vec<Movie> =
+                                catalog.movies.into_iter().map(|m| m.into_movie()).collect();
+                            movies_clone.lock().await.insert(genre.clone(), movies);
                             println!("Films mis à jour : {}", genre);
                         }
                     } else if msg.topic == "recommendations/result" {
-                        if let Ok(reco) = serde_json::from_str::<Vec<RecommendedMovie>>(&payload) {
+                        // JSON (petit payload : liste d'id)
+                        if let Ok(reco) =
+                            serde_json::from_slice::<Vec<RecommendedMovie>>(&msg.payload)
+                        {
                             // Reconstituer les films complets depuis la HashMap movies
                             let movies = movies_clone.lock().await;
                             let all_movies: HashMap<u32, &Movie> =
@@ -257,9 +261,8 @@ async fn get_movie_details(Path(id): Path<u32>) -> Json<serde_json::Value> {
         title: details["title"].as_str().unwrap_or("").to_string(),
         genres,
         rating: details["vote_average"].as_f64().unwrap_or(0.0) as f32,
-        poster_path: details["poster_path"]
-            .as_str()
-            .map(|p| format!("https://image.tmdb.org/t/p/w500{}", p)),
+        // Suffixe uniquement : l'UI reconstruit l'URL (cohérent avec la grille).
+        poster_path: details["poster_path"].as_str().map(|p| p.to_string()),
         overview: details["overview"].as_str().unwrap_or("").to_string(),
         release_date: details["release_date"].as_str().map(|s| s.to_string()),
         duration: details["runtime"].as_u64().map(|d| d as u32),
