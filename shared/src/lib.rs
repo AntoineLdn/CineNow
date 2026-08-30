@@ -46,15 +46,11 @@ fn families() -> &'static WeatherFamilies {
 pub fn normalize_genre(genre: &str) -> String {
     genre
         .to_lowercase()
-        .replace('é', "e")
-        .replace('è', "e")
-        .replace('ê', "e")
-        .replace('à', "a")
-        .replace('â', "a")
+        .replace(['é', 'è', 'ê'], "e")
+        .replace(['à', 'â'], "a")
         .replace('ô', "o")
         .replace('û', "u")
-        .replace('î', "i")
-        .replace('ï', "i")
+        .replace(['î', 'ï'], "i")
         .replace('ç', "c")
         .replace("histoire/biopic", "histoire")
 }
@@ -131,7 +127,7 @@ mod tests {
     fn test_affinities_not_empty() {
         let a = get_affinities("joy", "Ensoleillé");
         assert!(!a.is_empty());
-        assert!(a.values().all(|&v| v >= 0.0 && v <= 1.0));
+        assert!(a.values().all(|&v| (0.0..=1.0).contains(&v)));
     }
 
     #[test]

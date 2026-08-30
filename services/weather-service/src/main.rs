@@ -63,8 +63,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tokio::spawn(async move {
         loop {
             match eventloop.poll().await {
-                Ok(rumqttc::Event::Incoming(rumqttc::Packet::Publish(p))) => {
-                    if p.topic == "weather/location" {
+                Ok(rumqttc::Event::Incoming(rumqttc::Packet::Publish(p)))
+                    if p.topic == "weather/location" => {
                         if let Ok(loc) = serde_json::from_slice::<LocationUpdate>(&p.payload) {
                             println!(
                                 "Nouvelle localisation reçue : lat={}, lon={}",
@@ -77,7 +77,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             let _ = tx.send((loc.lat.to_string(), loc.lon.to_string(), city_name));
                         }
                     }
-                }
                 Err(e) => {
                     eprintln!("Erreur MQTT: {:?}", e);
                     tokio::time::sleep(Duration::from_secs(1)).await;
