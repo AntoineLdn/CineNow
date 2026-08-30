@@ -81,7 +81,7 @@ async fn main() -> Result<()> {
                             topic_name,
                             count,
                             bytes.len(),
-                            if count > 0 { bytes.len() / count } else { 0 }
+                            bytes.len().checked_div(count).unwrap_or(0)
                         );
                         let topic = format!("movies/{}", topic_name);
                         let _ = mqtt_client.publish(&topic, QoS::AtLeastOnce, true, bytes);
