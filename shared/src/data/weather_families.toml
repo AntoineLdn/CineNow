@@ -1,0 +1,11 @@
+# Regroupe les conditions météo brutes (émises par le weather-service)
+# en familles utilisées par la matrice d'affinité.
+# Ajouter une condition = ajouter une ligne ici, rien à toucher dans le code.
+
+"Ensoleillé"  = "sun"
+"Nuageux"     = "cloudy"
+"Brouillard"  = "cloudy"
+"Pluie"       = "rain"
+"Averses"     = "rain"
+"Neige"       = "snow"
+"Orageux"     = "storm"

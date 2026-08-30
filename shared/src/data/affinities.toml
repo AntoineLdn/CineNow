@@ -1,0 +1,259 @@
+# Matrice d'affinité : humeur -> famille météo (ou "default") -> genre = score [0.0..1.0]
+#
+# Résolution : get_affinities(mood, condition) prend la section [mood.<famille>]
+# si elle existe, sinon [mood.default]. La famille est déduite de la condition
+# via weather_families.toml.
+#
+# Ajouter une humeur   = ajouter un bloc [nouvelle_humeur.*] ci-dessous.
+# Ajouter une famille  = ajouter une section [humeur.<famille>] là où c'est utile.
+# Aucun code à modifier dans les deux cas.
+
+# ---------------------------------------------------------------- joy
+[joy.default]
+comedie = 0.8
+animation = 0.7
+familial = 0.7
+romance = 0.5
+
+[joy.sun]
+comedie = 1.0
+romance = 0.9
+animation = 0.8
+familial = 0.6
+aventure = 0.5
+
+[joy.rain]
+comedie = 0.8
+romance = 0.8
+animation = 0.7
+familial = 0.5
+
+[joy.storm]
+comedie = 0.7
+animation = 0.7
+familial = 0.6
+
+[joy.snow]
+animation = 0.9
+familial = 0.9
+comedie = 0.8
+romance = 0.5
+
+# ---------------------------------------------------------------- sad
+[sad.default]
+drame = 0.9
+romance = 0.7
+histoire = 0.6
+
+[sad.rain]
+drame = 1.0
+romance = 0.9
+histoire = 0.7
+documentaire = 0.5
+
+[sad.storm]
+drame = 1.0
+thriller = 0.7
+histoire = 0.5
+
+[sad.sun]
+drame = 0.7
+histoire = 0.8
+romance = 0.6
+comedie = 0.4
+
+[sad.snow]
+drame = 0.8
+romance = 0.9
+familial = 0.6
+
+# ---------------------------------------------------------------- angry
+[angry.default]
+action = 0.9
+thriller = 0.8
+guerre = 0.7
+
+[angry.storm]
+action = 1.0
+thriller = 1.0
+guerre = 0.9
+science-fiction = 0.5
+
+[angry.rain]
+action = 0.9
+thriller = 0.9
+guerre = 0.8
+
+[angry.sun]
+action = 0.9
+aventure = 0.8
+thriller = 0.7
+science-fiction = 0.5
+
+[angry.snow]
+action = 0.8
+thriller = 0.8
+guerre = 0.7
+
+# ---------------------------------------------------------------- calm
+[calm.default]
+documentaire = 0.8
+histoire = 0.8
+animation = 0.7
+
+[calm.sun]
+documentaire = 0.9
+animation = 0.8
+familial = 0.8
+romance = 0.6
+
+[calm.cloudy]
+documentaire = 1.0
+histoire = 0.9
+romance = 0.7
+drame = 0.5
+
+[calm.rain]
+documentaire = 0.9
+histoire = 0.8
+drame = 0.7
+romance = 0.5
+
+[calm.snow]
+documentaire = 0.9
+animation = 0.9
+familial = 0.8
+romance = 0.5
+
+# ---------------------------------------------------------------- tired
+[tired.default]
+animation = 0.9
+familial = 0.9
+comedie = 0.7
+
+[tired.rain]
+familial = 1.0
+animation = 1.0
+comedie = 0.7
+fantastique = 0.6
+
+[tired.snow]
+familial = 1.0
+animation = 1.0
+comedie = 0.8
+romance = 0.5
+
+[tired.storm]
+animation = 0.9
+familial = 0.9
+comedie = 0.7
+
+[tired.sun]
+animation = 0.8
+comedie = 0.8
+romance = 0.7
+familial = 0.6
+
+# ---------------------------------------------------------------- fear
+[fear.default]
+comedie = 0.8
+familial = 0.7
+thriller = 0.5
+
+[fear.sun]
+comedie = 1.0
+familial = 0.9
+romance = 0.8
+animation = 0.6
+
+[fear.storm]
+thriller = 0.9
+horreur = 0.8
+action = 0.5
+
+[fear.rain]
+comedie = 0.8
+familial = 0.7
+thriller = 0.6
+animation = 0.5
+
+[fear.snow]
+familial = 0.9
+animation = 0.8
+comedie = 0.7
+
+# ---------------------------------------------------------------- adventure
+[adventure.default]
+aventure = 0.9
+fantastique = 0.9
+science-fiction = 0.8
+action = 0.6
+
+[adventure.sun]
+aventure = 1.0
+fantastique = 1.0
+science-fiction = 0.9
+action = 0.8
+animation = 0.4
+
+[adventure.rain]
+aventure = 0.9
+fantastique = 0.8
+science-fiction = 0.8
+action = 0.6
+
+[adventure.storm]
+action = 1.0
+aventure = 0.9
+guerre = 0.8
+science-fiction = 0.6
+
+[adventure.snow]
+aventure = 1.0
+fantastique = 0.9
+action = 0.8
+animation = 0.5
+
+# ---------------------------------------------------------------- reflection
+[reflection.default]
+documentaire = 0.9
+histoire = 0.8
+drame = 0.8
+science-fiction = 0.6
+
+[reflection.rain]
+documentaire = 1.0
+drame = 1.0
+science-fiction = 0.8
+histoire = 0.7
+
+[reflection.cloudy]
+documentaire = 1.0
+histoire = 0.9
+science-fiction = 0.8
+drame = 0.6
+
+[reflection.sun]
+histoire = 0.8
+documentaire = 0.8
+drame = 0.7
+romance = 0.4
+
+[reflection.snow]
+documentaire = 0.9
+science-fiction = 0.9
+histoire = 0.8
+drame = 0.6
+
+[reflection.storm]
+drame = 0.9
+thriller = 0.8
+science-fiction = 0.8
+documentaire = 0.6
+
+# ---------------------------------------------------------------- fallback
+# Utilisé quand l'humeur reçue est inconnue (ancien bras `_` du match).
+[unknown.default]
+comedie = 0.3
+action = 0.3
+drame = 0.3
