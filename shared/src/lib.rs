@@ -31,9 +31,7 @@ type WeatherFamilies = HashMap<String, String>;
 
 fn matrix() -> &'static AffinityMatrix {
     static MATRIX: OnceLock<AffinityMatrix> = OnceLock::new();
-    MATRIX.get_or_init(|| {
-        toml::from_str(AFFINITIES_TOML).expect("affinities.toml invalide")
-    })
+    MATRIX.get_or_init(|| toml::from_str(AFFINITIES_TOML).expect("affinities.toml invalide"))
 }
 
 fn families() -> &'static WeatherFamilies {
@@ -139,14 +137,20 @@ mod tests {
     #[test]
     fn test_family_resolution() {
         // Averses et Pluie partagent la famille "rain" -> mêmes affinités.
-        assert_eq!(get_affinities("sad", "Pluie"), get_affinities("sad", "Averses"));
+        assert_eq!(
+            get_affinities("sad", "Pluie"),
+            get_affinities("sad", "Averses")
+        );
     }
 
     #[test]
     fn test_default_fallback_on_unmapped_family() {
         // "reflection" n'a pas d'override pour la famille "snow"? Il en a un.
         // "joy" n'a pas de section "cloudy" -> doit retomber sur default.
-        assert_eq!(get_affinities("joy", "Nuageux"), get_affinities("joy", "Vent inconnu"));
+        assert_eq!(
+            get_affinities("joy", "Nuageux"),
+            get_affinities("joy", "Vent inconnu")
+        );
     }
 
     #[test]

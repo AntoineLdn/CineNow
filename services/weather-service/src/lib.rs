@@ -20,7 +20,9 @@ pub fn translate_weather_code(code: i32) -> String {
 }
 
 pub fn get_time_of_day(time_str: &str) -> String {
-    let hour = time_str.split('T').nth(1)
+    let hour = time_str
+        .split('T')
+        .nth(1)
         .and_then(|t| t.split(':').next())
         .and_then(|h| h.parse::<u32>().ok())
         .unwrap_or(12);

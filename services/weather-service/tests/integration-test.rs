@@ -1,4 +1,4 @@
-use weather_service::{translate_weather_code, get_time_of_day};
+use weather_service::{get_time_of_day, translate_weather_code};
 
 /// Scénario 1 : Codes météo limites — vérifier les bornes des plages
 #[test]

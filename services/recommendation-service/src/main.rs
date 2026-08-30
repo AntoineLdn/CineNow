@@ -4,17 +4,26 @@ use serde::Deserialize;
 use std::{collections::HashMap, env, sync::Arc, time::Duration};
 use tokio::sync::Mutex;
 
-use recommendation_service::{WeatherData, compute_recommendations};
+use recommendation_service::{compute_recommendations, WeatherData};
 
 // Topics entrants
 const TOPIC_WEATHER: &str = "weather/current";
 const TOPIC_MOOD: &str = "mood/selected";
 const MOVIE_TOPICS: &[&str] = &[
-    "movies/comedie", "movies/romance", "movies/animation",
-    "movies/drame", "movies/action", "movies/thriller",
-    "movies/guerre", "movies/horreur", "movies/familial",
-    "movies/aventure", "movies/fantastique", "movies/science-fiction",
-    "movies/documentaire", "movies/histoire",
+    "movies/comedie",
+    "movies/romance",
+    "movies/animation",
+    "movies/drame",
+    "movies/action",
+    "movies/thriller",
+    "movies/guerre",
+    "movies/horreur",
+    "movies/familial",
+    "movies/aventure",
+    "movies/fantastique",
+    "movies/science-fiction",
+    "movies/documentaire",
+    "movies/histoire",
 ];
 
 // Topic sortant
@@ -66,9 +75,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             *state_clone.weather.lock().await = data;
                         }
                     } else if msg.topic.starts_with("movies/") {
-                        if let Ok(catalog) = serde_json::from_str::<shared::MovieCatalog>(&payload) {
+                        if let Ok(catalog) = serde_json::from_str::<shared::MovieCatalog>(&payload)
+                        {
                             let genre = msg.topic.replace("movies/", "");
-                            state_clone.movies.lock().await.insert(genre, catalog.movies);
+                            state_clone
+                                .movies
+                                .lock()
+                                .await
+                                .insert(genre, catalog.movies);
                         }
                     } else if msg.topic == TOPIC_MOOD {
                         if let Ok(mood_data) = serde_json::from_str::<MoodPayload>(&payload) {
@@ -77,11 +91,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             let weather = state_clone.weather.lock().await.clone();
                             let movies = state_clone.movies.lock().await.clone();
 
-                            let recommendations = compute_recommendations(
-                                &mood_data.moods,
-                                &weather,
-                                &movies,
-                            );
+                            let recommendations =
+                                compute_recommendations(&mood_data.moods, &weather, &movies);
 
                             println!("{} films recommandés", recommendations.len());
 

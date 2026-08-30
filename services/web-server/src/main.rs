@@ -1,10 +1,10 @@
+use axum::extract::Path;
 use axum::{
     extract::State,
     http::Method,
     routing::{get, post},
     Json, Router,
 };
-use axum::extract::Path;
 use dotenvy::dotenv;
 use rumqttc::{AsyncClient, MqttOptions, Packet, QoS};
 use serde::{Deserialize, Serialize};
@@ -55,17 +55,26 @@ struct MovieDetails {
     poster_path: Option<String>,
     overview: String,
     release_date: Option<String>,
-    duration: Option<u32>,        // en minutes
+    duration: Option<u32>, // en minutes
     director: Option<String>,
-    actors: Vec<String>,          // 5 premiers
+    actors: Vec<String>, // 5 premiers
 }
 
 const MOVIE_TOPICS: &[&str] = &[
-    "movies/comedie", "movies/romance", "movies/animation",
-    "movies/drame", "movies/action", "movies/thriller",
-    "movies/guerre", "movies/horreur", "movies/familial",
-    "movies/aventure", "movies/fantastique", "movies/science-fiction",
-    "movies/documentaire", "movies/histoire",
+    "movies/comedie",
+    "movies/romance",
+    "movies/animation",
+    "movies/drame",
+    "movies/action",
+    "movies/thriller",
+    "movies/guerre",
+    "movies/horreur",
+    "movies/familial",
+    "movies/aventure",
+    "movies/fantastique",
+    "movies/science-fiction",
+    "movies/documentaire",
+    "movies/histoire",
 ];
 
 #[tokio::main]
@@ -85,7 +94,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (client, mut eventloop) = AsyncClient::new(mqttoptions, 20);
 
     let weather_state = Arc::new(Mutex::new(WeatherData::default()));
-    let movies_state: Arc<Mutex<HashMap<String, Vec<Movie>>>> = Arc::new(Mutex::new(HashMap::new()));
+    let movies_state: Arc<Mutex<HashMap<String, Vec<Movie>>>> =
+        Arc::new(Mutex::new(HashMap::new()));
     let recommendations_state: Arc<Mutex<Vec<Movie>>> = Arc::new(Mutex::new(Vec::new()));
 
     let weather_clone = weather_state.clone();
@@ -107,18 +117,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     } else if msg.topic.starts_with("movies/") {
                         if let Ok(catalog) = serde_json::from_str::<MovieCatalog>(&payload) {
                             let genre = msg.topic.replace("movies/", "");
-                            movies_clone.lock().await.insert(genre.clone(), catalog.movies);
+                            movies_clone
+                                .lock()
+                                .await
+                                .insert(genre.clone(), catalog.movies);
                             println!("Films mis à jour : {}", genre);
                         }
                     } else if msg.topic == "recommendations/result" {
                         if let Ok(reco) = serde_json::from_str::<Vec<RecommendedMovie>>(&payload) {
                             // Reconstituer les films complets depuis la HashMap movies
                             let movies = movies_clone.lock().await;
-                            let all_movies: HashMap<u32, &Movie> = movies
-                                .values()
-                                .flatten()
-                                .map(|m| (m.id, m))
-                                .collect();
+                            let all_movies: HashMap<u32, &Movie> =
+                                movies.values().flatten().map(|m| (m.id, m)).collect();
 
                             // Respecter l'ordre des scores
                             let result: Vec<Movie> = reco
@@ -138,8 +148,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     // ENSUITE les subscribes
-    client.subscribe("weather/current", QoS::AtLeastOnce).await?;
-    client.subscribe("recommendations/result", QoS::AtLeastOnce).await?;
+    client
+        .subscribe("weather/current", QoS::AtLeastOnce)
+        .await?;
+    client
+        .subscribe("recommendations/result", QoS::AtLeastOnce)
+        .await?;
     for topic in MOVIE_TOPICS {
         client.subscribe(*topic, QoS::AtLeastOnce).await?;
     }
@@ -181,9 +195,7 @@ async fn get_movies(State(state): State<AppState>) -> Json<HashMap<String, Vec<M
     Json(state.movies.lock().await.clone())
 }
 
-async fn get_movie_details(
-    Path(id): Path<u32>,
-) -> Json<serde_json::Value> {
+async fn get_movie_details(Path(id): Path<u32>) -> Json<serde_json::Value> {
     let tmdb_key = std::env::var("TMDB_API_KEY").unwrap_or_default();
 
     // Fetch détails + crédits en parallèle
@@ -268,7 +280,10 @@ async fn post_mood(
 ) -> Json<serde_json::Value> {
     println!("Humeur reçue : {:?}", payload.moods);
     if let Ok(mqtt_msg) = serde_json::to_string(&payload) {
-        let _ = state.mqtt_client.publish("mood/selected", QoS::AtLeastOnce, false, mqtt_msg).await;
+        let _ = state
+            .mqtt_client
+            .publish("mood/selected", QoS::AtLeastOnce, false, mqtt_msg)
+            .await;
     }
     Json(serde_json::json!({ "status": "success" }))
 }
@@ -277,9 +292,15 @@ async fn post_location(
     State(state): State<AppState>,
     Json(payload): Json<LocationData>,
 ) -> Json<serde_json::Value> {
-    println!("Position reçue (Lat: {}, Lon: {})", payload.lat, payload.lon);
+    println!(
+        "Position reçue (Lat: {}, Lon: {})",
+        payload.lat, payload.lon
+    );
     if let Ok(mqtt_msg) = serde_json::to_string(&payload) {
-        let _ = state.mqtt_client.publish("weather/location", QoS::AtLeastOnce, false, mqtt_msg).await;
+        let _ = state
+            .mqtt_client
+            .publish("weather/location", QoS::AtLeastOnce, false, mqtt_msg)
+            .await;
     }
     Json(serde_json::json!({ "status": "success" }))
 }

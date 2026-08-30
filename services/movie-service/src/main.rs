@@ -1,7 +1,7 @@
 use anyhow::Result;
-use rumqttc::{MqttOptions, Client, QoS};
-use std::time::Duration;
+use rumqttc::{Client, MqttOptions, QoS};
 use serde_json::Value;
+use std::time::Duration;
 
 const GENRES: &[(&str, u32)] = &[
     ("comedie", 35),
@@ -51,11 +51,9 @@ async fn main() -> Result<()> {
     println!("Movie Service démarré...");
     dotenvy::dotenv().ok();
 
-    let tmdb_key = std::env::var("TMDB_API_KEY")
-        .expect("TMDB_API_KEY manquante dans .env");
+    let tmdb_key = std::env::var("TMDB_API_KEY").expect("TMDB_API_KEY manquante dans .env");
 
-    let broker_host = std::env::var("MQTT_BROKER_HOST")
-        .unwrap_or_else(|_| "localhost".to_string());
+    let broker_host = std::env::var("MQTT_BROKER_HOST").unwrap_or_else(|_| "localhost".to_string());
     let broker_port: u16 = std::env::var("MQTT_BROKER_PORT")
         .unwrap_or_else(|_| "1883".to_string())
         .parse()
@@ -71,11 +69,15 @@ async fn main() -> Result<()> {
             match fetch_movies_by_genre(&tmdb_key, *genre_id).await {
                 Ok(movies) => {
                     let count = movies.len();
-                    let catalog = shared::MovieCatalog { total: count, movies };
+                    let catalog = shared::MovieCatalog {
+                        total: count,
+                        movies,
+                    };
                     println!(" {} : {} films", topic_name, count);
                     if let Ok(json) = serde_json::to_string(&catalog) {
                         let topic = format!("movies/{}", topic_name);
-                        let _ = mqtt_client.publish(&topic, QoS::AtLeastOnce, true, json.as_bytes());
+                        let _ =
+                            mqtt_client.publish(&topic, QoS::AtLeastOnce, true, json.as_bytes());
                     }
                 }
                 Err(e) => eprintln!(" Erreur {} : {}", topic_name, e),

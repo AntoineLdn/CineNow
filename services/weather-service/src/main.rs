@@ -1,11 +1,11 @@
-use rumqttc::{MqttOptions, AsyncClient, QoS};
-use std::time::Duration;
-use serde::{Deserialize, Serialize};
 use dotenvy::dotenv;
+use rumqttc::{AsyncClient, MqttOptions, QoS};
+use serde::{Deserialize, Serialize};
 use std::env;
+use std::time::Duration;
 use tokio::sync::watch;
 
-use weather_service::{translate_weather_code, get_time_of_day, get_city_name};
+use weather_service::{get_city_name, get_time_of_day, translate_weather_code};
 
 #[derive(Debug, Deserialize)]
 struct WeatherResponse {
@@ -52,7 +52,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     mqttoptions.set_keep_alive(Duration::from_secs(5));
     let (client, mut eventloop) = AsyncClient::new(mqttoptions, 10);
 
-    client.subscribe("weather/location", QoS::AtLeastOnce).await?;
+    client
+        .subscribe("weather/location", QoS::AtLeastOnce)
+        .await?;
 
     let (tx, mut rx) = watch::channel((default_lat, default_lon, default_city));
     let client_clone = client.clone();
@@ -64,7 +66,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 Ok(rumqttc::Event::Incoming(rumqttc::Packet::Publish(p))) => {
                     if p.topic == "weather/location" {
                         if let Ok(loc) = serde_json::from_slice::<LocationUpdate>(&p.payload) {
-                            println!("Nouvelle localisation reçue : lat={}, lon={}", loc.lat, loc.lon);
+                            println!(
+                                "Nouvelle localisation reçue : lat={}, lon={}",
+                                loc.lat, loc.lon
+                            );
 
                             let city_name = get_city_name(loc.lat, loc.lon).await;
                             println!("Ville identifiée : {}", city_name);
@@ -86,7 +91,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     loop {
         let (current_lat, current_lon, current_city) = rx.borrow().clone();
 
-        println!("Recherche météo pour : {} ({}, {})", current_city, current_lat, current_lon);
+        println!(
+            "Recherche météo pour : {} ({}, {})",
+            current_city, current_lat, current_lon
+        );
 
         let url = format!(
             "https://api.open-meteo.com/v1/forecast?latitude={}&longitude={}&current=weather_code,is_day,temperature_2m",
@@ -103,7 +111,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 };
 
                 if let Ok(payload) = serde_json::to_string(&update) {
-                    let _ = client_clone.publish("weather/current", QoS::AtLeastOnce, true, payload).await;
+                    let _ = client_clone
+                        .publish("weather/current", QoS::AtLeastOnce, true, payload)
+                        .await;
                     println!("Météo envoyée : {}°C, {}", update.temp, update.condition);
                 }
             }
