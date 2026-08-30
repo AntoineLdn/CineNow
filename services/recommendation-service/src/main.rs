@@ -68,24 +68,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         loop {
             match eventloop.poll().await {
                 Ok(rumqttc::Event::Incoming(Packet::Publish(msg))) => {
-                    let payload = String::from_utf8_lossy(&msg.payload);
-
                     if msg.topic == TOPIC_WEATHER {
-                        if let Ok(data) = serde_json::from_str::<WeatherData>(&payload) {
+                        // JSON (petit payload, lisible dans le broker)
+                        if let Ok(data) = serde_json::from_slice::<WeatherData>(&msg.payload) {
                             *state_clone.weather.lock().await = data;
                         }
                     } else if msg.topic.starts_with("movies/") {
-                        if let Ok(catalog) = serde_json::from_str::<shared::MovieCatalog>(&payload)
+                        // Binaire (bincode) + DTO allégé, reconstruit en Movie complet
+                        if let Ok(catalog) =
+                            bincode::deserialize::<shared::MovieCatalogLite>(&msg.payload)
                         {
                             let genre = msg.topic.replace("movies/", "");
-                            state_clone
-                                .movies
-                                .lock()
-                                .await
-                                .insert(genre, catalog.movies);
+                            let movies: Vec<shared::Movie> =
+                                catalog.movies.into_iter().map(|m| m.into_movie()).collect();
+                            state_clone.movies.lock().await.insert(genre, movies);
                         }
                     } else if msg.topic == TOPIC_MOOD {
-                        if let Ok(mood_data) = serde_json::from_str::<MoodPayload>(&payload) {
+                        // JSON (petit payload)
+                        if let Ok(mood_data) = serde_json::from_slice::<MoodPayload>(&msg.payload) {
                             println!("Humeur reçue : {:?}", mood_data.moods);
 
                             let weather = state_clone.weather.lock().await.clone();
@@ -96,6 +96,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                             println!("{} films recommandés", recommendations.len());
 
+                            // JSON sortant : petit payload (liste d'id + score)
                             if let Ok(json) = serde_json::to_string(&recommendations) {
                                 let _ = client_clone
                                     .publish(TOPIC_RESULT, QoS::AtLeastOnce, false, json)

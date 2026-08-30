@@ -44,7 +44,7 @@ const TMDB_GENRE_MAP: &[(u32, &str)] = &[
 ];
 
 const PAGES: u32 = 5;
-const MAX_MOVIES: usize = 30;
+const MAX_MOVIES: usize = 55;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -69,15 +69,22 @@ async fn main() -> Result<()> {
             match fetch_movies_by_genre(&tmdb_key, *genre_id).await {
                 Ok(movies) => {
                     let count = movies.len();
-                    let catalog = shared::MovieCatalog {
+                    let catalog = shared::MovieCatalogLite {
                         total: count,
                         movies,
                     };
-                    println!(" {} : {} films", topic_name, count);
-                    if let Ok(json) = serde_json::to_string(&catalog) {
+                    // Payload binaire (bincode) + DTO allégé : plus compact que JSON
+                    // pour rester sous la limite de taille de paquet du broker.
+                    if let Ok(bytes) = bincode::serialize(&catalog) {
+                        println!(
+                            " {} : {} films = {} octets ({} o/film)",
+                            topic_name,
+                            count,
+                            bytes.len(),
+                            if count > 0 { bytes.len() / count } else { 0 }
+                        );
                         let topic = format!("movies/{}", topic_name);
-                        let _ =
-                            mqtt_client.publish(&topic, QoS::AtLeastOnce, true, json.as_bytes());
+                        let _ = mqtt_client.publish(&topic, QoS::AtLeastOnce, true, bytes);
                     }
                 }
                 Err(e) => eprintln!(" Erreur {} : {}", topic_name, e),
@@ -120,8 +127,8 @@ fn create_mqtt_client(host: &str, port: u16) -> Client {
     client
 }
 
-async fn fetch_movies_by_genre(api_key: &str, genre_id: u32) -> Result<Vec<shared::Movie>> {
-    let mut all_movies: Vec<shared::Movie> = Vec::new();
+async fn fetch_movies_by_genre(api_key: &str, genre_id: u32) -> Result<Vec<shared::MovieLite>> {
+    let mut all_movies: Vec<shared::MovieLite> = Vec::new();
 
     for page in 1..=PAGES {
         let url = format!(
@@ -137,16 +144,9 @@ async fn fetch_movies_by_genre(api_key: &str, genre_id: u32) -> Result<Vec<share
             None => break,
         };
 
-        let movies: Vec<shared::Movie> = results
+        let movies: Vec<shared::MovieLite> = results
             .iter()
             .filter_map(|item| {
-                let overview = item["overview"]
-                    .as_str()
-                    .unwrap_or("")
-                    .chars()
-                    .take(100)
-                    .collect::<String>();
-
                 // Récupérer tous les genre_ids TMDb et les convertir en noms normalisés
                 let genre_ids: Vec<u64> = item["genre_ids"]
                     .as_array()
@@ -155,15 +155,13 @@ async fn fetch_movies_by_genre(api_key: &str, genre_id: u32) -> Result<Vec<share
 
                 let genres = tmdb_genre_ids_to_names(&genre_ids);
 
-                Some(shared::Movie {
+                Some(shared::MovieLite {
                     id: item["id"].as_u64()? as u32,
                     title: item["title"].as_str()?.to_string(),
                     genres,
                     rating: item["vote_average"].as_f64()? as f32,
-                    poster_path: item["poster_path"]
-                        .as_str()
-                        .map(|p| format!("https://image.tmdb.org/t/p/w500{}", p)),
-                    overview,
+                    // On ne garde que le suffixe TMDb ; l'UI reconstruit l'URL.
+                    poster: item["poster_path"].as_str().map(|p| p.to_string()),
                     release_date: item["release_date"].as_str().map(|d| d.to_string()),
                 })
             })
