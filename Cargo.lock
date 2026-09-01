@@ -5583,6 +5583,7 @@ dependencies = [
  "bincode",
  "dotenvy",
  "jsonwebtoken",
+ "rand_core",
  "reqwest 0.12.28",
  "rumqttc",
  "serde",
