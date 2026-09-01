@@ -1,0 +1,88 @@
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: cinenow-mosquitto
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    ports:
+      # Exposé vers l'hôte pour pouvoir brancher un client MQTT de debug
+      # (MQTT Explorer, etc.). À retirer pour un déploiement fermé.
+      - "1883:1883"
+    networks:
+      - cinenow
+
+  weather-service:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: cinenow-backend
+    container_name: cinenow-weather
+    command: weather-service
+    environment:
+      MQTT_BROKER_HOST: mosquitto
+      MQTT_BROKER_PORT: 1883
+      DEFAULT_LATITUDE: ${DEFAULT_LATITUDE:-45.7640}
+      DEFAULT_LONGITUDE: ${DEFAULT_LONGITUDE:-4.8357}
+      DEFAULT_CITY: ${DEFAULT_CITY:-Lyon}
+    depends_on:
+      - mosquitto
+    networks:
+      - cinenow
+    restart: unless-stopped
+
+  movie-service:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: cinenow-backend
+    container_name: cinenow-movie
+    command: movie-service
+    environment:
+      MQTT_BROKER_HOST: mosquitto
+      MQTT_BROKER_PORT: 1883
+      TMDB_API_KEY: ${TMDB_API_KEY:?TMDB_API_KEY manquante (voir .env)}
+    depends_on:
+      - mosquitto
+    networks:
+      - cinenow
+    restart: unless-stopped
+
+  recommendation-service:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: cinenow-backend
+    container_name: cinenow-reco
+    command: recommendation-service
+    environment:
+      MQTT_BROKER_HOST: mosquitto
+      MQTT_BROKER_PORT: 1883
+    depends_on:
+      - mosquitto
+    networks:
+      - cinenow
+    restart: unless-stopped
+
+  web-server:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: cinenow-backend
+    container_name: cinenow-web
+    command: web-server
+    environment:
+      MQTT_BROKER_HOST: mosquitto
+      MQTT_BROKER_PORT: 1883
+      TMDB_API_KEY: ${TMDB_API_KEY:?TMDB_API_KEY manquante (voir .env)}
+    ports:
+      # L'UI Tauri (hors Docker) tape ici : http://localhost:3001
+      - "3001:3001"
+    depends_on:
+      - mosquitto
+    networks:
+      - cinenow
+    restart: unless-stopped
+
+networks:
+  cinenow:
+    driver: bridge
