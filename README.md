@@ -27,6 +27,7 @@ Projet de Programmation Répartie - Rust
 ### Traitements réalisés
 
 - Algorithme de scoring : chaque film reçoit un score basé sur `rating × multiplicateur(humeur, météo)`
+- Matrice d'affinité pilotée par des données (fichiers TOML), sans logique codée en dur
 - Diversification : maximum 4 films par genre dans le top 20
 - Géocodage inversé des coordonnées GPS en nom de ville
 
@@ -46,28 +47,39 @@ Projet de Programmation Répartie - Rust
 
 ## 🏗️ Architecture
 
-**4 services Rust** communiquant via **MQTT (Shiftr Desktop)**  
+**4 services Rust** communiquant via **MQTT (Mosquitto)**
 **Interface hybride** : Tauri + React + Tailwind CSS
 
 ![Architecture Ciné-Now](docs/architecture.png)
 
 ### Choix technologiques
 
-**IPC : MQTT**  
-Choisi pour sa légèreté, son modèle publish/subscribe adapté aux événements, et la simplicité de déploiement via Shiftr Desktop. L'ordre de démarrage des services n'est pas critique grâce aux messages retained.
+**IPC : MQTT**
+Choisi pour sa légèreté, son modèle publish/subscribe adapté aux événements, et
+la simplicité de déploiement. L'ordre de démarrage des services n'est pas
+critique grâce aux messages retained. Le broker Mosquitto est fourni comme
+conteneur Docker, ce qui évite toute installation manuelle et permet de
+configurer la taille maximale des paquets (utile pour les gros catalogues).
 
-**Interface : Tauri**  
-Choisi pour son intégration native avec Rust, sa légèreté comparée à Electron, et la possibilité de créer une interface web moderne (React) tout en bénéficiant d'un exécutable natif.
+**Sérialisation MQTT : bincode**
+Les catalogues de films (`movies/*`) sont transmis en binaire (bincode) plutôt
+qu'en JSON, via un DTO allégé `MovieLite`, pour réduire fortement la taille des
+messages. Les autres topics, plus petits, restent en JSON pour rester lisibles.
+
+**Interface : Tauri**
+Choisi pour son intégration native avec Rust, sa légèreté comparée à Electron,
+et la possibilité de créer une interface web moderne (React) tout en bénéficiant
+d'un exécutable natif.
 
 ### Topics MQTT
 
-| Topic | Publié par | Souscrit par | Description |
-|---|---|---|---|
-| `weather/current` | weather-service | web-server, recommendation-service | Météo actuelle |
-| `weather/location` | web-server | weather-service | Coordonnées GPS |
-| `movies/{genre}` | movie-service | web-server, recommendation-service | Catalogue par genre |
-| `mood/selected` | web-server | recommendation-service | Humeurs sélectionnées |
-| `recommendations/result` | recommendation-service | web-server | IDs + scores recommandés |
+| Topic | Publié par | Souscrit par | Format | Description |
+|---|---|---|---|---|
+| `weather/current` | weather-service | web-server, recommendation-service | JSON | Météo actuelle |
+| `weather/location` | web-server | weather-service | JSON | Coordonnées GPS |
+| `movies/{genre}` | movie-service | web-server, recommendation-service | bincode | Catalogue par genre |
+| `mood/selected` | web-server | recommendation-service | JSON | Humeurs sélectionnées |
+| `recommendations/result` | recommendation-service | web-server | JSON | IDs + scores recommandés |
 
 ### Routes HTTP (web-server, port 3001)
 
@@ -84,31 +96,34 @@ Choisi pour son intégration native avec Rust, sa légèreté comparée à Elect
 
 ## 🚀 Installation
 
+L'application se lance en deux parties :
+- **le backend** (4 services Rust + broker MQTT) tourne dans **Docker** ;
+- **l'interface** (Tauri) se lance en natif sur votre machine, car une application
+  de bureau native ne peut pas être conteneurisée.
+
 ### Prérequis
 
-#### 1. Rust (version 1.75 ou supérieure)
+#### 1. Docker Desktop
+- **Windows / Mac** : https://www.docker.com/products/docker-desktop
+- **Linux** : Docker Engine + plugin Docker Compose
+- Sur Windows, installer :   ```wls --install```
+  (Docker Desktop guide l'installation).
+
+#### 2. Node.js (v20 ou supérieure) — pour l'interface Tauri
+- https://nodejs.org/
+
+#### 3. Rust (version 1.77 ou supérieure) — pour l'interface Tauri
 - **Windows** : https://rustup.rs/
 - **Linux/Mac** :
   ```bash
   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
   ```
-  Sur les machines IUT, utiliser une version locale :
-  ```bash
-  export RUSTUP_HOME=~/.rustup
-  rustup install stable
-  ```
+> Le backend est compilé dans Docker : Rust n'est nécessaire en local que pour
+> lancer l'interface Tauri.
 
-#### 2. Node.js (v18 ou supérieure)
-- https://nodejs.org/
+#### 4. Dépendances système Linux (pour l'interface Tauri uniquement)
 
-#### 3. Shiftr Desktop (broker MQTT)
-- https://www.shiftr.io/desktop#downloads
-- Interface de monitoring : http://localhost:3000
-- Port MQTT : 1883
-
-#### 4. Dépendances système Linux (pour Tauri)
-
-Les dépendances suivantes sont le minimum requis, d'autres peuvent être nécessaires selon la distribution :
+Nécessaires seulement pour lancer l'interface en natif sous Linux :
 
 ```bash
 sudo apt update
@@ -135,8 +150,8 @@ sudo apt install \
 
 1. Cloner le dépôt :
 ```bash
-git clone https://gitlab.iut-valence.fr/canalsal/r5.a_08-cinenow.git
-cd r5.a_08-cinenow
+git clone https://github.com/AntoineLdn/CineNow.git
+cd CineNow
 ```
 
 2. Copier et configurer le fichier d'environnement :
@@ -148,74 +163,55 @@ cp .env.example .env
 Copy-Item .env.example .env
 ```
 
-3. Remplir `.env` avec votre clé TMDb
+3. Remplir `.env` avec votre clé TMDb (`TMDB_API_KEY`).
 
-4. Compiler le projet :
+4. Installer les dépendances de l'interface :
 ```bash
-cargo build
-cd ui && npm install
+cd ui && npm install && cd ..
 ```
 
 ---
 
 ## ▶️ Lancement
 
-### Mode développement
+### 1. Backend (Docker)
 
-1. Lancer **Shiftr Desktop**
-2. Exécuter le script :
+Depuis le dossier `docker/` :
 
-**Windows** — lance les services ET l'interface Tauri automatiquement :
-```powershell
-.\scripts\run-dev.ps1
-```
-
-**Linux** — lance uniquement les services Rust :
 ```bash
-chmod +x scripts/run-dev.sh
-./scripts/run-dev.sh
+cd docker
+docker compose --env-file ../.env up --build
 ```
 
-> ⚠️ Sur Linux, l'interface Tauri doit être lancée manuellement après avoir installé les dépendances système (voir prérequis) :
-> ```bash
-> cd ui && npm run tauri dev
-> ```
+Cette commande compile les 4 services, démarre le broker Mosquitto et lance
+tout le backend. Le web-server est exposé sur http://localhost:3001.
 
-Ou manuellement dans des terminaux séparés (dans cet ordre) :
+- Après une modification d'un service Rust, relancer avec `--build`.
+- Sans modification, `docker compose --env-file ../.env up` suffit.
+- Pour arrêter : `Ctrl+C`, puis `docker compose down`.
+
+### 2. Interface (Tauri)
+
+Dans un **second terminal**, depuis le dossier `ui/` :
+
 ```bash
-cargo run -p weather-service
-cargo run -p movie-service
-cargo run -p recommendation-service
-cargo run -p web-server
-cd ui && npm run tauri dev 
+cd ui
+npm run tauri dev
 ```
 
-### Mode release
+L'interface s'ouvre et communique avec le backend via http://localhost:3001.
 
-1. Lancer **Shiftr Desktop**
-2. Exécuter le script :
+### Monitoring MQTT (optionnel)
 
-**Windows** — compile tout, lance les services et ouvre le dossier pour lancer l'exe Tauri :
-```powershell
-.\scripts\run-release.ps1
-```
-
-**Linux** — compile et lance uniquement les services Rust :
-```bash
-./scripts/run-release.sh
-```
-
-> ⚠️ Sur Linux, lancer ensuite l'interface manuellement :
-> ```bash
-> cd ui && npm run tauri build  # si pas encore compilé
-> ./ui/src-tauri/target/release/CineNow
-> ```
-
-3. **Windows** : Double-cliquer sur l'exe **Ciné-Now** dans le dossier `target/release/` qui s'ouvre automatiquement.
+Le broker Mosquitto expose le port `1883` sur la machine hôte. Vous pouvez y
+brancher un client MQTT (par exemple MQTT Explorer) pour observer les échanges
+entre services.
 
 ---
 
 ## 🧪 Tests
+
+Les tests s'exécutent en local (Rust installé requis) :
 
 ```bash
 # Tous les tests (unitaires + intégration)
@@ -233,6 +229,9 @@ cargo test -p recommendation-service --test integration_test
 cargo test -p weather-service --lib
 cargo test -p recommendation-service --lib
 ```
+
+L'intégration continue (GitHub Actions) exécute `fmt`, `clippy`, `build` et
+`test` sur l'ensemble du workspace à chaque push et pull request.
 
 ---
 
