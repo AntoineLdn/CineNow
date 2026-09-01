@@ -74,6 +74,13 @@ services:
       MQTT_BROKER_HOST: mosquitto
       MQTT_BROKER_PORT: 1883
       TMDB_API_KEY: ${TMDB_API_KEY:?TMDB_API_KEY manquante (voir .env)}
+      # Base SQLite stockée dans le volume persistant monté sur /data.
+      DATABASE_URL: sqlite:///data/cinenow.db
+      # Secret de signature des tokens : DOIT être défini dans .env (>= 32 caractères).
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET manquante (voir .env, min 32 caractères)}
+    volumes:
+      # Volume nommé : la base survit aux redémarrages et rebuilds.
+      - cinenow-data:/data
     ports:
       # L'UI Tauri (hors Docker) tape ici : http://localhost:3001
       - "3001:3001"
@@ -86,3 +93,6 @@ services:
 networks:
   cinenow:
     driver: bridge
+
+volumes:
+  cinenow-data:

@@ -40,6 +40,9 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates libssl3 \
     && rm -rf /var/lib/apt/lists/*
 
+# Répertoire pour la base SQLite (monté comme volume par docker-compose).
+RUN mkdir -p /data
+
 WORKDIR /app
 COPY --from=builder /out/ /usr/local/bin/
 
