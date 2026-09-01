@@ -43,8 +43,8 @@ const TMDB_GENRE_MAP: &[(u32, &str)] = &[
     (37, "western"),
 ];
 
-const PAGES: u32 = 5;
-const MAX_MOVIES: usize = 55;
+const PAGES: u32 = 7;
+const MAX_MOVIES: usize = 100;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -112,6 +112,7 @@ fn tmdb_genre_ids_to_names(ids: &[u64]) -> Vec<String> {
 fn create_mqtt_client(host: &str, port: u16) -> Client {
     let mut opts = MqttOptions::new("movie-service", host, port);
     opts.set_keep_alive(Duration::from_secs(5));
+    opts.set_max_packet_size(262144, 262144);
 
     let (client, mut connection) = Client::new(opts, 10);
 

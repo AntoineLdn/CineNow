@@ -90,7 +90,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut mqttoptions = MqttOptions::new("web-server", broker_host, broker_port);
     mqttoptions.set_keep_alive(Duration::from_secs(5));
-
+    mqttoptions.set_max_packet_size(262144, 262144);
+    
     let (client, mut eventloop) = AsyncClient::new(mqttoptions, 20);
 
     let weather_state = Arc::new(Mutex::new(WeatherData::default()));
