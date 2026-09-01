@@ -1,14 +1,17 @@
 import { useState } from "react";
 import Sidebar from "./components/Sidebar";
 import Home from "./pages/Home";
+import AuthPanel from "./components/AuthPanel";
+import { useAuth } from "./context/AuthContext";
 
 function App() {
+  const { isLoggedIn } = useAuth();
   const [selectedMoods, setSelectedMoods] = useState([]);
   const [recommendations, setRecommendations] = useState(null); // null = pas encore demandé
 
   const toggleMood = (moodId) => {
     setSelectedMoods((prev) =>
-      prev.includes(moodId) ? prev.filter((id) => id !== moodId) : [...prev, moodId]
+        prev.includes(moodId) ? prev.filter((id) => id !== moodId) : [...prev, moodId]
     );
   };
 
@@ -34,18 +37,23 @@ function App() {
     setRecommendations(null);
   };
 
+  // Mur d'authentification : tant que non connecté, on n'affiche que le panneau.
+  if (!isLoggedIn) {
+    return <AuthPanel />;
+  }
+
   return (
-    <div className="flex h-screen bg-stone-50 text-stone-800">
-      <Sidebar
-        selectedMoods={selectedMoods}
-        onToggle={toggleMood}
-        onRecommend={handleRecommend}
-        onReset={handleReset}
-      />
-      <main className="flex-1 overflow-y-scroll">
-        <Home recommendations={recommendations} />
-      </main>
-    </div>
+      <div className="flex h-screen bg-stone-50 text-stone-800">
+        <Sidebar
+            selectedMoods={selectedMoods}
+            onToggle={toggleMood}
+            onRecommend={handleRecommend}
+            onReset={handleReset}
+        />
+        <main className="flex-1 overflow-y-scroll">
+          <Home recommendations={recommendations} />
+        </main>
+      </div>
   );
 }
 
