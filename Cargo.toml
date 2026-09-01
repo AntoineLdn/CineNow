@@ -31,3 +31,9 @@ shared = { path = "./shared" }
 toml = "0.8"
 bincode = "1.3"
 
+# Espace utilisateur (web-server)
+sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite", "migrate"] }
+argon2 = "0.5"
+jsonwebtoken = "9"
+
+
