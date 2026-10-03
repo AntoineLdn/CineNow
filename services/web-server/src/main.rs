@@ -1,17 +1,24 @@
 use axum::extract::Path;
 use axum::{
-    extract::State,
+    extract::{FromRef, State},
     http::Method,
-    routing::{get, post},
+    routing::{delete, get, post},
     Json, Router,
 };
 use dotenvy::dotenv;
 use rumqttc::{AsyncClient, MqttOptions, Packet, QoS};
 use serde::{Deserialize, Serialize};
 use shared::{Movie, MovieCatalogLite};
+use sqlx::SqlitePool;
 use std::{collections::HashMap, env, sync::Arc, time::Duration};
 use tokio::sync::Mutex;
 use tower_http::cors::{Any, CorsLayer};
+
+mod auth;
+mod db;
+mod handlers;
+
+use handlers::{auth_handlers, user_handlers};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 struct WeatherData {
@@ -44,6 +51,15 @@ struct AppState {
     movies: Arc<Mutex<HashMap<String, Vec<Movie>>>>,
     recommendations: Arc<Mutex<Vec<Movie>>>,
     mqtt_client: AsyncClient,
+    db: SqlitePool,
+}
+
+// Permet d'extraire directement un SqlitePool depuis AppState dans les handlers
+// (State<SqlitePool>), tout en gardant AppState pour les routes existantes.
+impl FromRef<AppState> for SqlitePool {
+    fn from_ref(state: &AppState) -> Self {
+        state.db.clone()
+    }
 }
 
 #[derive(Debug, Serialize)]
@@ -81,6 +97,12 @@ const MOVIE_TOPICS: &[&str] = &[
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenv().ok();
     println!("Web Server démarré...");
+
+    // Base de données : URL depuis l'env, valeur par défaut locale sinon.
+    let database_url =
+        env::var("DATABASE_URL").unwrap_or_else(|_| "sqlite://data/cinenow.db".to_string());
+    let db = db::init_pool(&database_url).await?;
+    println!("Base de données prête ({database_url})");
 
     let broker_host = env::var("MQTT_BROKER_HOST").unwrap_or_else(|_| "localhost".to_string());
     let broker_port: u16 = env::var("MQTT_BROKER_PORT")
@@ -168,20 +190,44 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         movies: movies_state,
         recommendations: recommendations_state,
         mqtt_client: client,
+        db,
     };
 
     let cors = CorsLayer::new()
-        .allow_methods([Method::GET, Method::POST])
+        .allow_methods([Method::GET, Method::POST, Method::DELETE])
         .allow_headers(Any)
         .allow_origin(Any);
 
     let app = Router::new()
+        // Routes existantes
         .route("/weather", get(get_weather))
         .route("/movies", get(get_movies))
         .route("/recommendations", get(get_recommendations))
         .route("/location", post(post_location))
         .route("/mood", post(post_mood))
         .route("/movie/:id", get(get_movie_details))
+        // Authentification
+        .route("/auth/register", post(auth_handlers::register))
+        .route("/auth/login", post(auth_handlers::login))
+        // Espace utilisateur (protégé par token)
+        .route("/me/likes", get(user_handlers::list_likes))
+        .route(
+            "/me/likes/:movie_id",
+            post(user_handlers::add_like).delete(user_handlers::remove_like),
+        )
+        .route("/me/watched", get(user_handlers::list_watched))
+        .route(
+            "/me/watched/:movie_id",
+            post(user_handlers::add_watched).delete(user_handlers::remove_watched),
+        )
+        .route(
+            "/me/favorite-genres",
+            get(user_handlers::list_favorite_genres).post(user_handlers::add_favorite_genre),
+        )
+        .route(
+            "/me/favorite-genres/:genre",
+            delete(user_handlers::remove_favorite_genre),
+        )
         .with_state(app_state)
         .layer(cors);
 
