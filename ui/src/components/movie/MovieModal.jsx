@@ -1,11 +1,35 @@
 import { useEffect, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faXmark, faStar, faClock, faUser, faFilm, faFire } from "@fortawesome/free-solid-svg-icons";
+import { faXmark, faStar, faClock, faUser, faFilm, faFire, faHeart, faEye } from "@fortawesome/free-solid-svg-icons";
+import {
+  faHeart as faHeartOutline,
+  faEye as faEyeOutline,
+} from "@fortawesome/free-regular-svg-icons";
 import { posterUrl } from "../../utils/poster";
+import { useUserData } from "../../context/UserDataContext";
+
+// Bouton d'action pleine largeur : orange quand actif, neutre sinon.
+function ActionButton({ active, activeIcon, idleIcon, activeLabel, idleLabel, onClick }) {
+  return (
+      <button
+          onClick={onClick}
+          aria-pressed={active}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold border transition-all ${
+              active
+                  ? "bg-orange-50 border-orange-400 text-orange-700"
+                  : "bg-stone-50 border-stone-200 text-stone-500 hover:border-orange-300 hover:bg-white"
+          }`}
+      >
+        <FontAwesomeIcon icon={active ? activeIcon : idleIcon} />
+        {active ? activeLabel : idleLabel}
+      </button>
+  );
+}
 
 function MovieModal({ movie, onClose }) {
   const [details, setDetails] = useState(null);
   const [loading, setLoading] = useState(true);
+  const { isLiked, isWatched, toggleLike, toggleWatched } = useUserData();
 
   useEffect(() => {
     if (!movie) return;
@@ -59,6 +83,26 @@ function MovieModal({ movie, onClose }) {
               {movie.release_date && (
                   <p className="text-stone-400 text-sm mt-1">{movie.release_date.slice(0, 4)}</p>
               )}
+
+              {/* Actions de l'espace utilisateur */}
+              <div className="flex gap-2 mt-4">
+                <ActionButton
+                    active={isLiked(movie.id)}
+                    activeIcon={faHeart}
+                    idleIcon={faHeartOutline}
+                    activeLabel="Dans mes favoris"
+                    idleLabel="J'aime"
+                    onClick={() => toggleLike(movie.id)}
+                />
+                <ActionButton
+                    active={isWatched(movie.id)}
+                    activeIcon={faEye}
+                    idleIcon={faEyeOutline}
+                    activeLabel="Déjà vu"
+                    idleLabel="Marquer comme vu"
+                    onClick={() => toggleWatched(movie.id)}
+                />
+              </div>
 
               {loading ? (
                   <p className="text-stone-400 text-center py-8">Chargement des détails...</p>
