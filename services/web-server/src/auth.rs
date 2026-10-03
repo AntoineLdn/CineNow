@@ -79,7 +79,6 @@ pub fn issue_token(user_id: i64, username: &str) -> Result<String, jsonwebtoken:
 /// absent ou invalide.
 pub struct AuthUser {
     pub id: i64,
-    pub username: String,
 }
 
 #[async_trait]
@@ -109,7 +108,6 @@ where
 
         Ok(AuthUser {
             id: data.claims.sub,
-            username: data.claims.username,
         })
     }
 }
