@@ -2,6 +2,7 @@ import React from 'react';
 import logo from "../assets/cinenow.png";
 import WeatherCard from "./WeatherCard";
 import MoodSelector from "./MoodSelector";
+import FavoriteGenres from "./FavoriteGenres";
 import { useAuth } from "../context/AuthContext";
 
 const Sidebar = ({ selectedMoods, onToggle, onRecommend, onReset }) => {
@@ -16,6 +17,7 @@ const Sidebar = ({ selectedMoods, onToggle, onRecommend, onReset }) => {
             <div className="flex flex-col gap-8 flex-1">
                 <WeatherCard />
                 <MoodSelector selectedMoods={selectedMoods} onToggle={onToggle} />
+                <FavoriteGenres />
 
                 {selectedMoods.length > 0 && (
                     <div className="flex flex-col gap-2">

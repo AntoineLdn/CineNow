@@ -5,7 +5,7 @@ import AuthPanel from "./components/AuthPanel";
 import { useAuth } from "./context/AuthContext";
 
 function App() {
-  const { isLoggedIn } = useAuth();
+  const { isLoggedIn, restoring } = useAuth();
   const [selectedMoods, setSelectedMoods] = useState([]);
   const [recommendations, setRecommendations] = useState(null); // null = pas encore demandé
 
@@ -36,6 +36,16 @@ function App() {
     setSelectedMoods([]);
     setRecommendations(null);
   };
+
+  // Lecture du keychain en cours : on n'affiche ni l'app ni le mur d'auth, sinon
+  // ce dernier apparaîtrait une fraction de seconde à chaque lancement.
+  if (restoring) {
+    return (
+        <div className="flex items-center justify-center h-screen bg-stone-50 text-stone-400">
+          Ouverture de la session...
+        </div>
+    );
+  }
 
   // Mur d'authentification : tant que non connecté, on n'affiche que le panneau.
   if (!isLoggedIn) {

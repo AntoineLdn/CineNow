@@ -1,9 +1,28 @@
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faStar, faFire } from "@fortawesome/free-solid-svg-icons";
+import { faStar, faFire, faHeart, faEye } from "@fortawesome/free-solid-svg-icons";
+import {
+  faHeart as faHeartOutline,
+  faEye as faEyeOutline,
+} from "@fortawesome/free-regular-svg-icons";
 import { posterUrl } from "../../utils/poster";
+import { useUserData } from "../../context/UserDataContext";
+
+// Les actions restent discrètes : visibles au survol, mais toujours affichées
+// quand elles sont actives, sinon on ne verrait pas ce qu'on a déjà marqué.
+function actionClass(active) {
+  return `w-8 h-8 flex items-center justify-center rounded-lg bg-white/90 backdrop-blur-sm shadow-sm transition-all hover:bg-white hover:scale-110 ${
+      active
+          ? "text-orange-500"
+          : "text-stone-400 opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+  }`;
+}
 
 function MovieCard({ movie, onClick }) {
   const poster = posterUrl(movie.poster_path);
+  const { isLiked, isWatched, toggleLike, toggleWatched } = useUserData();
+
+  const liked = isLiked(movie.id);
+  const watched = isWatched(movie.id);
 
   return (
       <div
@@ -33,6 +52,29 @@ function MovieCard({ movie, onClick }) {
                 {movie.release_date.slice(0, 4)}
               </div>
           )}
+
+          {/* Actions : un clic ici ne doit pas ouvrir la fiche du film */}
+          <div
+              className="absolute bottom-3 right-3 flex gap-2"
+              onClick={(e) => e.stopPropagation()}
+          >
+            <button
+                onClick={() => toggleLike(movie.id)}
+                className={actionClass(liked)}
+                aria-pressed={liked}
+                title={liked ? "Retirer des favoris" : "J'aime"}
+            >
+              <FontAwesomeIcon icon={liked ? faHeart : faHeartOutline} className="text-sm" />
+            </button>
+            <button
+                onClick={() => toggleWatched(movie.id)}
+                className={actionClass(watched)}
+                aria-pressed={watched}
+                title={watched ? "Marquer comme non vu" : "Déjà vu"}
+            >
+              <FontAwesomeIcon icon={watched ? faEye : faEyeOutline} className="text-sm" />
+            </button>
+          </div>
         </div>
 
         <div className="p-4 flex flex-col flex-1 justify-between">

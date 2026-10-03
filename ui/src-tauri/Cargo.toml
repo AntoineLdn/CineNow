@@ -23,3 +23,20 @@ tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
+# Stockage du token dans le gestionnaire de secrets natif de l'OS.
+#
+# Attention : `keyring = "3"` seul n'active AUCUN backend et retombe
+# silencieusement sur un store factice en mémoire — le token serait perdu à
+# chaque fermeture. Il faut donc activer explicitement la feature de la
+# plateforme, et comme chacune ne compile que sur son OS, elles passent par des
+# sections [target.'cfg(...)'] distinctes.
+
+[target.'cfg(windows)'.dependencies]
+keyring = { version = "3", features = ["windows-native"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+keyring = { version = "3", features = ["apple-native"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+keyring = { version = "3", features = ["sync-secret-service", "crypto-rust"] }
+
