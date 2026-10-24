@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faMagnifyingGlass } from "@fortawesome/free-solid-svg-icons";
 import MovieGrid from "../components/movie/MovieGrid";
+import { getMovies } from "../api/client";
 
 const normalizeText = (text) =>
   text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -21,8 +22,7 @@ const tabs = [
 
 
   useEffect(() => {
-    fetch("http://localhost:3001/movies")
-      .then((res) => res.json())
+    getMovies()
       .then((data) => { setMoviesByGenre(data); setLoading(false); })
       .catch(() => setLoading(false));
   }, []);

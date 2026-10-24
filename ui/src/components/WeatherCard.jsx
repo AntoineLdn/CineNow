@@ -3,6 +3,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faLocationDot, faCrosshairs } from "@fortawesome/free-solid-svg-icons";
 import { weatherThemes } from "../themes/weatherThemes";
 import { Particles } from "./Particles";
+import { getWeather, sendLocation } from "../api/client";
 
 
 function getParticles(condition, isDay) {
@@ -17,8 +18,7 @@ function WeatherCard() {
   const [weather, setWeather] = useState(null);
 
   const fetchWeather = () => {
-    fetch("http://localhost:3001/weather")
-      .then((res) => res.json())
+    getWeather()
       .then((data) => setWeather(data))
       .catch((err) => console.error("Erreur météo:", err));
   };
@@ -40,21 +40,15 @@ function WeatherCard() {
           
           console.log(`📍 Coordonnées trouvées : Lat ${lat}, Lon ${lon}`);
 
-          fetch("http://localhost:3001/location", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ lat, lon }),
-          })
-          .then((res) => {
-            if (res.ok) {
+          sendLocation(lat, lon)
+            .then(() => {
               console.log("✅ Position envoyée ! Actualisation dans 1.5s...");
-              
+
               setTimeout(() => {
                 fetchWeather();
               }, 1500);
-            }
-          })
-          .catch((err) => console.error("❌ Erreur envoi position :", err));
+            })
+            .catch((err) => console.error("❌ Erreur envoi position :", err));
         },
         (error) => {
           console.error("❌ Erreur géolocalisation :", error.message);

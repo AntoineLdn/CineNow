@@ -7,6 +7,7 @@ import {
 } from "@fortawesome/free-regular-svg-icons";
 import { posterUrl } from "../../utils/poster";
 import { useUserData } from "../../context/UserDataContext";
+import { getMovieDetails } from "../../api/client";
 
 // Bouton d'action pleine largeur : orange quand actif, neutre sinon.
 function ActionButton({ active, activeIcon, idleIcon, activeLabel, idleLabel, onClick }) {
@@ -35,8 +36,7 @@ function MovieModal({ movie, onClose }) {
     if (!movie) return;
     setLoading(true);
     setDetails(null);
-    fetch(`http://localhost:3001/movie/${movie.id}`)
-        .then((res) => res.json())
+    getMovieDetails(movie.id)
         .then((data) => { setDetails(data); setLoading(false); })
         .catch(() => setLoading(false));
   }, [movie]);

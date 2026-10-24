@@ -3,6 +3,7 @@ import Sidebar from "./components/Sidebar";
 import Home from "./pages/Home";
 import AuthPanel from "./components/AuthPanel";
 import { useAuth } from "./context/AuthContext";
+import { getRecommendations } from "./api/client";
 
 function App() {
   const { isLoggedIn, restoring } = useAuth();
@@ -18,18 +19,7 @@ function App() {
   const handleRecommend = async () => {
     if (selectedMoods.length === 0) return;
 
-    await fetch("http://localhost:3001/mood", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ moods: selectedMoods }),
-    });
-
-    // On attend que le recommendation-service ait eu le temps de calculer
-    setTimeout(async () => {
-      const res = await fetch("http://localhost:3001/recommendations");
-      const data = await res.json();
-      setRecommendations(data);
-    }, 1000);
+    setRecommendations(await getRecommendations(selectedMoods));
   };
 
   const handleReset = () => {
