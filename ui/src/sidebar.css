@@ -1,9 +1,5 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
-@import "tailwindcss";
-
-* {
-  font-family: 'Inter', sans-serif;
-}
+/* Tailwind et les polices sont chargés par index.css. Ce fichier ne garde que
+   les animations de la carte météo, en attendant leur refonte. */
 
 /* Animations Métiers (utilisées selon le code Rust) */
 
