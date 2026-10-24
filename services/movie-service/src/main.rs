@@ -43,8 +43,8 @@ const TMDB_GENRE_MAP: &[(u32, &str)] = &[
     (37, "western"),
 ];
 
-const PAGES: u32 = 7;
-const MAX_MOVIES: usize = 100;
+const PAGES: u32 = 10;
+const MAX_MOVIES: usize = 200;
 
 #[tokio::main]
 async fn main() -> Result<()> {
