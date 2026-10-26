@@ -1,7 +1,6 @@
 use anyhow::Result;
 use rumqttc::{Client, MqttOptions, QoS};
 use serde_json::Value;
-use shared::MQTT_MAX_PACKET_SIZE;
 use std::time::Duration;
 
 const GENRES: &[(&str, u32)] = &[
@@ -113,7 +112,7 @@ fn tmdb_genre_ids_to_names(ids: &[u64]) -> Vec<String> {
 fn create_mqtt_client(host: &str, port: u16) -> Client {
     let mut opts = MqttOptions::new("movie-service", host, port);
     opts.set_keep_alive(Duration::from_secs(5));
-    opts.set_max_packet_size(MQTT_MAX_PACKET_SIZE, MQTT_MAX_PACKET_SIZE);
+    opts.set_max_packet_size(shared::MQTT_MAX_PACKET_SIZE, shared::MQTT_MAX_PACKET_SIZE);
 
     let (client, mut connection) = Client::new(opts, 10);
 
