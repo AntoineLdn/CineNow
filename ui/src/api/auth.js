@@ -104,6 +104,24 @@ export function login(username, password) {
     return authenticate("/auth/login", username, password);
 }
 
+// ------------------------------------------------------------ Recommandation
+
+/**
+ * Demande une recommandation et attend la réponse du serveur, qui ne revient
+ * qu'une fois le calcul fait — il n'y a plus de délai à deviner côté client.
+ *
+ * @param {string[]} moods
+ * @returns {Promise<import("./client").Movie[]>}
+ */
+export async function getRecommendations(moods) {
+    const res = await fetchAuth("/recommendations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ moods }),
+    });
+    return res.json();
+}
+
 // ---------------------------------------------------------------- Espace user
 
 export async function getLikes() {

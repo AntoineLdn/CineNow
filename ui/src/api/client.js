@@ -92,20 +92,5 @@ export function getMovieDetails(movieId) {
     return apiJson(`/movie/${movieId}`);
 }
 
-// --------------------------------------------------------- Recommandations
-
-// Le serveur ne répond pas la recommandation : il la publie sur MQTT, et le
-// résultat n'apparaît sur /recommendations qu'une fois le calcul fait. D'où
-// cette attente, seul endroit où elle vit — quand le backend renverra le
-// résultat directement, cette fonction sera la seule à changer.
-const RECOMMENDATION_DELAY_MS = 1000;
-
-/**
- * @param {string[]} moods
- * @returns {Promise<Movie[]>}
- */
-export async function getRecommendations(moods) {
-    await postJson("/mood", { moods });
-    await new Promise((resolve) => setTimeout(resolve, RECOMMENDATION_DELAY_MS));
-    return apiJson("/recommendations");
-}
+// La recommandation vit dans auth.js : la route est authentifiée, donc elle
+// passe par fetchAuth comme les autres.
