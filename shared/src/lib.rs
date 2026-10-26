@@ -2,6 +2,14 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::OnceLock;
 
+/// Taille maximale des paquets MQTT, entrants et sortants, pour tous les
+/// services. Fait sauter la limite par défaut de rumqttc (~10 Ko) : les
+/// catalogues de films dépassent largement.
+///
+/// Le broker doit autoriser au moins autant — voir `max_packet_size` dans
+/// docker/mosquitto.conf, qui répète la valeur faute de pouvoir la partager.
+pub const MQTT_MAX_PACKET_SIZE: usize = 262_144;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Movie {
     pub id: u32,
