@@ -135,6 +135,10 @@ export function UserDataProvider({ children }) {
     );
 
     const value = {
+        // Listes exposées pour Ma liste et le récap du profil ; les Set restent
+        // internes, ils ne servent qu'aux tests d'appartenance.
+        likedIds: [...likes],
+        watchedIds: [...watched],
         isLiked: (movieId) => likes.has(movieId),
         isWatched: (movieId) => watched.has(movieId),
         toggleLike,

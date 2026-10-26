@@ -1,13 +1,107 @@
-/* Scrollbar personnalisée */
+@import "tailwindcss";
+
+/* Polices embarquées : l'app tourne hors ligne, rien ne doit partir chez Google. */
+@import "@fontsource-variable/big-shoulders-display";
+@import "@fontsource-variable/manrope";
+
+@theme {
+  /* Velours — surfaces, du plus sombre au plus clair */
+  --color-rail: #1c0f15;
+  --color-base: #24141b;
+  --color-surface: #321d26;
+  --color-raised: #3f2630;
+  --color-edge: #5a3a47;
+
+  /* Velours — texte */
+  --color-ink: #f4e9df;
+  --color-muted: #c7b2a8;
+  --color-prose: #e3d3c8;
+
+  /* Velours — accent */
+  --color-gold: #f0b44c;
+  --color-on-gold: #24141b;
+
+  /* Teintes de la carte météo, par condition */
+  --color-rain: #2b3550;
+  --color-sun: #5a3a1e;
+  --color-snow: #34404f;
+  --color-storm: #2e2433;
+
+  --font-display: "Big Shoulders Display Variable", "Arial Narrow", sans-serif;
+  --font-sans: "Manrope Variable", system-ui, sans-serif;
+
+  --text-greeting: clamp(56px, 7vw, 104px);
+  --text-greeting--line-height: 0.92;
+  --text-temp: 112px;
+  --text-temp--line-height: 1;
+  --text-section: 42px;
+  --text-section--line-height: 1.05;
+
+  --radius-pill: 999px;
+  --radius-surface: 24px;
+  --radius-poster: 14px;
+
+  /* Largeur de la barre latérale et hauteur des pastilles */
+  --spacing-rail: 96px;
+  --spacing-pill: 46px;
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    background-color: var(--color-base);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    font-weight: 800;
+  }
+
+  ::selection {
+    background-color: var(--color-gold);
+    color: var(--color-on-gold);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-gold);
+    outline-offset: 2px;
+  }
+}
+
+/* Scrollbar assortie au thème */
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-base);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #d6d3d1;
-  border-radius: 999px;
+  background: var(--color-edge);
+  border: 2px solid var(--color-base);
+  border-radius: var(--radius-pill);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #a8a29e;
+  background: var(--color-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

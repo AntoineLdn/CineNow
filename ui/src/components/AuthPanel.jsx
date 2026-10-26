@@ -1,6 +1,9 @@
 import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
 
+const FIELD_CLASS =
+    "w-full h-pill px-5 rounded-pill bg-raised border border-edge text-ink placeholder:text-muted transition-colors focus:border-gold";
+
 // Panneau de connexion / inscription affiché tant que l'utilisateur n'est pas connecté.
 function AuthPanel() {
     const { login, register } = useAuth();
@@ -10,17 +13,16 @@ function AuthPanel() {
     const [error, setError] = useState(null);
     const [loading, setLoading] = useState(false);
 
-    const submit = async () => {
+    const isRegister = mode === "register";
+
+    const submit = async (event) => {
+        event.preventDefault();
         setError(null);
         setLoading(true);
         try {
-            if (mode === "login") {
-                await login(username, password);
-            } else {
-                await register(username, password);
-            }
             // Pas besoin de rediriger : le contexte passe isLoggedIn à true,
             // et App affiche automatiquement l'application.
+            await (isRegister ? register : login)(username, password);
         } catch (e) {
             setError(e.message);
         } finally {
@@ -29,51 +31,72 @@ function AuthPanel() {
     };
 
     return (
-        <div className="flex items-center justify-center h-screen bg-stone-50">
-            <div className="max-w-sm w-full p-8 bg-white rounded-2xl shadow-sm border border-stone-100">
-                <h2 className="text-2xl font-bold text-stone-800 mb-1">Ciné-Now</h2>
-                <p className="text-stone-500 mb-6">
-                    {mode === "login" ? "Connectez-vous pour continuer" : "Créez votre compte"}
-                </p>
+        <div className="min-h-screen bg-base flex flex-col items-center justify-center p-8">
+            <h1 className="text-greeting leading-none text-center">CinéNow</h1>
+            <p className="text-muted mt-4 text-center">
+                {isRegister
+                    ? "Crée ton compte pour garder tes films."
+                    : "Connecte-toi pour retrouver ta sélection."}
+            </p>
 
-                <input
-                    type="text"
-                    placeholder="Nom d'utilisateur"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    className="w-full mb-3 px-4 py-2 rounded-lg border border-stone-200 focus:outline-none focus:ring-2 focus:ring-orange-400"
-                />
-                <input
-                    type="password"
-                    placeholder="Mot de passe"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && submit()}
-                    className="w-full mb-3 px-4 py-2 rounded-lg border border-stone-200 focus:outline-none focus:ring-2 focus:ring-orange-400"
-                />
+            <form
+                onSubmit={submit}
+                className="w-full max-w-sm bg-surface rounded-surface p-8 mt-10 flex flex-col gap-5"
+            >
+                <div>
+                    <label htmlFor="username" className="block text-sm font-semibold text-ink mb-2">
+                        Nom d'utilisateur
+                    </label>
+                    <input
+                        id="username"
+                        type="text"
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value)}
+                        autoComplete="username"
+                        className={FIELD_CLASS}
+                    />
+                </div>
 
-                {error && <p className="text-red-600 text-sm mb-3">{error}</p>}
+                <div>
+                    <label htmlFor="password" className="block text-sm font-semibold text-ink mb-2">
+                        Mot de passe
+                    </label>
+                    <input
+                        id="password"
+                        type="password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        autoComplete={isRegister ? "new-password" : "current-password"}
+                        className={FIELD_CLASS}
+                    />
+                    {isRegister && <p className="text-xs text-muted mt-2">8 caractères minimum.</p>}
+                </div>
+
+                {error && (
+                    <p role="alert" className="text-sm text-gold">
+                        {error}
+                    </p>
+                )}
 
                 <button
-                    onClick={submit}
+                    type="submit"
                     disabled={loading}
-                    className="w-full py-2.5 rounded-lg bg-orange-500 text-white font-semibold hover:bg-orange-600 transition-colors disabled:opacity-50"
+                    className="h-pill px-6 rounded-pill bg-gold text-on-gold font-semibold transition-opacity hover:opacity-90 disabled:opacity-40"
                 >
-                    {loading ? "..." : mode === "login" ? "Se connecter" : "S'inscrire"}
+                    {loading ? "..." : isRegister ? "Créer mon compte" : "Se connecter"}
                 </button>
 
                 <button
+                    type="button"
                     onClick={() => {
-                        setMode(mode === "login" ? "register" : "login");
+                        setMode(isRegister ? "login" : "register");
                         setError(null);
                     }}
-                    className="w-full mt-4 text-sm text-stone-500 hover:text-orange-600"
+                    className="text-sm text-muted min-h-11 transition-colors hover:text-ink"
                 >
-                    {mode === "login"
-                        ? "Pas de compte ? Créer un compte"
-                        : "Déjà un compte ? Se connecter"}
+                    {isRegister ? "Déjà un compte ? Se connecter" : "Pas de compte ? En créer un"}
                 </button>
-            </div>
+            </form>
         </div>
     );
 }

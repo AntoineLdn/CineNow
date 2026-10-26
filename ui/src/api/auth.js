@@ -10,8 +10,7 @@
 // lancement, plutôt qu'à chaque appel /me/*.
 
 import { invoke } from "@tauri-apps/api/core";
-
-const API_BASE = "http://localhost:3001";
+import { apiFetch, ApiError } from "./client";
 
 let authToken = null;
 let tokenLoaded = false; // le keychain a-t-il déjà été consulté ?
@@ -58,11 +57,6 @@ async function authHeaders() {
     return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-async function parseError(res) {
-    const text = await res.text();
-    return text || `Erreur ${res.status}`;
-}
-
 // Prévenu quand le serveur rejette notre token : l'app remet l'écran de
 // connexion. Passe par un callback plutôt qu'un import d'AuthContext, pour ne
 // pas créer de dépendance circulaire entre le client et le contexte.
@@ -76,43 +70,38 @@ export function setUnauthorizedHandler(fn) {
 // (secret JWT changé côté serveur, base réinitialisée, token révoqué) déclenche
 // la déconnexion au lieu de laisser l'UI dans un état incohérent.
 async function fetchAuth(path, options = {}) {
-    const res = await fetch(`${API_BASE}${path}`, {
-        ...options,
-        headers: { ...(await authHeaders()), ...options.headers },
-    });
-
-    if (res.status === 401) {
-        await logout();
-        unauthorizedHandler?.();
-        throw new Error("Session expirée, reconnecte-toi.");
+    try {
+        return await apiFetch(path, {
+            ...options,
+            headers: { ...(await authHeaders()), ...options.headers },
+        });
+    } catch (e) {
+        if (e instanceof ApiError && e.status === 401) {
+            await logout();
+            unauthorizedHandler?.();
+            throw new Error("Session expirée, reconnecte-toi.");
+        }
+        throw e;
     }
-
-    if (!res.ok) throw new Error(await parseError(res));
-    return res;
 }
 
-export async function register(username, password) {
-    const res = await fetch(`${API_BASE}/auth/register`, {
+async function authenticate(path, username, password) {
+    const res = await apiFetch(path, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
     });
-    if (!res.ok) throw new Error(await parseError(res));
-    const data = await res.json();
-    await setToken(data.token);
-    return data; // { token, username }
-}
-
-export async function login(username, password) {
-    const res = await fetch(`${API_BASE}/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
-    });
-    if (!res.ok) throw new Error(await parseError(res));
-    const data = await res.json();
+    const data = await res.json(); // { token, username }
     await setToken(data.token);
     return data;
+}
+
+export function register(username, password) {
+    return authenticate("/auth/register", username, password);
+}
+
+export function login(username, password) {
+    return authenticate("/auth/login", username, password);
 }
 
 // ---------------------------------------------------------------- Espace user
