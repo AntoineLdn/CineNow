@@ -1,6 +1,9 @@
 use dotenvy::dotenv;
 use rumqttc::{AsyncClient, MqttOptions, Packet, QoS};
-use serde::Deserialize;
+use shared::{
+    RecommendationRequest, RecommendationResponse, MQTT_MAX_PACKET_SIZE,
+    TOPIC_RECOMMENDATION_REQUEST, TOPIC_RECOMMENDATION_RESULT,
+};
 use std::{collections::HashMap, env, sync::Arc, time::Duration};
 use tokio::sync::Mutex;
 
@@ -8,7 +11,6 @@ use recommendation_service::{compute_recommendations, WeatherData};
 
 // Topics entrants
 const TOPIC_WEATHER: &str = "weather/current";
-const TOPIC_MOOD: &str = "mood/selected";
 const MOVIE_TOPICS: &[&str] = &[
     "movies/comedie",
     "movies/romance",
@@ -25,14 +27,6 @@ const MOVIE_TOPICS: &[&str] = &[
     "movies/documentaire",
     "movies/histoire",
 ];
-
-// Topic sortant
-const TOPIC_RESULT: &str = "recommendations/result";
-
-#[derive(Debug, Deserialize)]
-struct MoodPayload {
-    moods: Vec<String>,
-}
 
 #[derive(Clone)]
 struct State {
@@ -53,7 +47,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut mqttoptions = MqttOptions::new("recommendation-service", broker_host, broker_port);
     mqttoptions.set_keep_alive(Duration::from_secs(5));
-    mqttoptions.set_max_packet_size(shared::MQTT_MAX_PACKET_SIZE, shared::MQTT_MAX_PACKET_SIZE);
+    mqttoptions.set_max_packet_size(MQTT_MAX_PACKET_SIZE, MQTT_MAX_PACKET_SIZE);
 
     let (client, mut eventloop) = AsyncClient::new(mqttoptions, 20);
 
@@ -85,23 +79,38 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 catalog.movies.into_iter().map(|m| m.into_movie()).collect();
                             state_clone.movies.lock().await.insert(genre, movies);
                         }
-                    } else if msg.topic == TOPIC_MOOD {
+                    } else if msg.topic == TOPIC_RECOMMENDATION_REQUEST {
                         // JSON (petit payload)
-                        if let Ok(mood_data) = serde_json::from_slice::<MoodPayload>(&msg.payload) {
-                            println!("Humeur reçue : {:?}", mood_data.moods);
+                        if let Ok(request) =
+                            serde_json::from_slice::<RecommendationRequest>(&msg.payload)
+                        {
+                            println!(
+                                "Requête {} : humeurs {:?}",
+                                request.request_id, request.moods
+                            );
 
                             let weather = state_clone.weather.lock().await.clone();
                             let movies = state_clone.movies.lock().await.clone();
 
                             let recommendations =
-                                compute_recommendations(&mood_data.moods, &weather, &movies);
+                                compute_recommendations(&request.moods, &weather, &movies);
 
                             println!("{} films recommandés", recommendations.len());
 
-                            // JSON sortant : petit payload (liste d'id + score)
-                            if let Ok(json) = serde_json::to_string(&recommendations) {
+                            // Le score ne sort pas : l'ordre de la liste le porte.
+                            let response = RecommendationResponse {
+                                request_id: request.request_id,
+                                movie_ids: recommendations.iter().map(|r| r.id).collect(),
+                            };
+
+                            if let Ok(json) = serde_json::to_string(&response) {
                                 let _ = client_clone
-                                    .publish(TOPIC_RESULT, QoS::AtLeastOnce, false, json)
+                                    .publish(
+                                        TOPIC_RECOMMENDATION_RESULT,
+                                        QoS::AtLeastOnce,
+                                        false,
+                                        json,
+                                    )
                                     .await;
                             }
                         }
@@ -118,7 +127,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // ENSUITE les subscribes
     client.subscribe(TOPIC_WEATHER, QoS::AtLeastOnce).await?;
-    client.subscribe(TOPIC_MOOD, QoS::AtLeastOnce).await?;
+    client
+        .subscribe(TOPIC_RECOMMENDATION_REQUEST, QoS::AtLeastOnce)
+        .await?;
     for topic in MOVIE_TOPICS {
         client.subscribe(*topic, QoS::AtLeastOnce).await?;
     }

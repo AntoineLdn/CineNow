@@ -10,6 +10,32 @@ use std::sync::OnceLock;
 /// docker/mosquitto.conf, qui répète la valeur faute de pouvoir la partager.
 pub const MQTT_MAX_PACKET_SIZE: usize = 262_144;
 
+/// Topics de l'échange requête / réponse des recommandations. Partagés pour que
+/// les deux services ne puissent pas diverger sur une faute de frappe.
+pub const TOPIC_RECOMMENDATION_REQUEST: &str = "recommendations/request";
+pub const TOPIC_RECOMMENDATION_RESULT: &str = "recommendations/result";
+
+/// Demande de recommandation, publiée par le web-server.
+///
+/// `request_id` corrèle la réponse à la requête : sans lui, deux demandes
+/// simultanées se mélangent.
+///
+/// Volontairement sans `deny_unknown_fields` : serde ignore les champs qu'il ne
+/// connaît pas, ce qui permettra d'ajouter les préférences utilisateur sans
+/// casser un service qui ne les lit pas encore.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecommendationRequest {
+    pub request_id: u64,
+    pub moods: Vec<String>,
+}
+
+/// Réponse du recommendation-service, dans l'ordre des scores décroissants.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecommendationResponse {
+    pub request_id: u64,
+    pub movie_ids: Vec<u32>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Movie {
     pub id: u32,
@@ -99,6 +125,16 @@ pub fn normalize_genre(genre: &str) -> String {
         .replace(['î', 'ï'], "i")
         .replace('ç', "c")
         .replace("histoire/biopic", "histoire")
+}
+
+/// Vrai si l'humeur est demandable, c'est-à-dire si elle a sa propre section
+/// dans la matrice. `unknown` en est exclue : c'est la section de repli, pas une
+/// humeur que le client peut choisir.
+///
+/// La liste des humeurs valides reste ainsi dans affinities.toml, sans copie
+/// dans le code.
+pub fn is_known_mood(mood: &str) -> bool {
+    mood != "unknown" && matrix().contains_key(mood)
 }
 
 /// Retourne la matrice d'affinité pour un contexte humeur + météo.

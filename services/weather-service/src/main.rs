@@ -1,6 +1,7 @@
 use dotenvy::dotenv;
 use rumqttc::{AsyncClient, MqttOptions, QoS};
 use serde::{Deserialize, Serialize};
+use shared::MQTT_MAX_PACKET_SIZE;
 use std::env;
 use std::time::Duration;
 use tokio::sync::watch;
@@ -50,7 +51,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut mqttoptions = MqttOptions::new("weather-service", broker_host, broker_port);
     mqttoptions.set_keep_alive(Duration::from_secs(5));
-    mqttoptions.set_max_packet_size(shared::MQTT_MAX_PACKET_SIZE, shared::MQTT_MAX_PACKET_SIZE);
+    mqttoptions.set_max_packet_size(MQTT_MAX_PACKET_SIZE, MQTT_MAX_PACKET_SIZE);
 
     let (client, mut eventloop) = AsyncClient::new(mqttoptions, 10);
 
