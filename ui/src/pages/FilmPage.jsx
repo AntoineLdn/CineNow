@@ -105,7 +105,7 @@ function FilmPage() {
             <BackLink />
 
             <div className="flex flex-col lg:flex-row gap-12 mt-10">
-                <div className="w-full lg:w-[420px] shrink-0 aspect-2/3 rounded-surface overflow-hidden bg-surface">
+                <div className="w-full lg:w-105 shrink-0 aspect-2/3 rounded-surface overflow-hidden bg-surface">
                     {poster ? (
                         <img src={poster} alt="" className="w-full h-full object-cover" />
                     ) : (
