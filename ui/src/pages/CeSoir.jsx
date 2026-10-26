@@ -1,7 +1,6 @@
-import { useState } from "react";
-import { getRecommendations } from "../api/client";
 import { contextLine, greetingLines } from "../data/weather";
 import { useWeather } from "../hooks/useWeather";
+import { useRecommendations } from "../context/RecommendationContext";
 import WeatherPanel from "../components/weather/WeatherPanel";
 import MoodPicker from "../components/mood/MoodPicker";
 import FeaturedMovie from "../components/movie/FeaturedMovie";
@@ -14,25 +13,7 @@ function moodCount(count) {
 
 function CeSoir() {
     const { weather, failed, locating, locationError, useMyLocation } = useWeather();
-    const [selectedMoods, setSelectedMoods] = useState([]);
-    const [results, setResults] = useState([]);
-    const [status, setStatus] = useState("idle"); // idle | loading | done | error
-
-    const toggleMood = (moodId) =>
-        setSelectedMoods((prev) =>
-            prev.includes(moodId) ? prev.filter((id) => id !== moodId) : [...prev, moodId]
-        );
-
-    const handleRecommend = async () => {
-        if (selectedMoods.length === 0) return;
-        setStatus("loading");
-        try {
-            setResults(await getRecommendations(selectedMoods));
-            setStatus("done");
-        } catch {
-            setStatus("error");
-        }
-    };
+    const { selectedMoods, toggleMood, results, status, recommend } = useRecommendations();
 
     const [greeting, invitation] = greetingLines(weather);
     const [featured, ...others] = results;
@@ -68,7 +49,7 @@ function CeSoir() {
 
                 <div className="flex flex-wrap items-center gap-4 mt-7">
                     <button
-                        onClick={handleRecommend}
+                        onClick={recommend}
                         disabled={selectedMoods.length === 0 || status === "loading"}
                         className="h-pill px-7 rounded-pill bg-gold text-on-gold font-semibold transition-opacity hover:opacity-90 disabled:opacity-40"
                     >
@@ -86,7 +67,7 @@ function CeSoir() {
                 <section role="alert" className="bg-surface rounded-surface p-7">
                     <p className="text-ink">La recommandation n'a pas abouti.</p>
                     <button
-                        onClick={handleRecommend}
+                        onClick={recommend}
                         className="h-pill px-6 rounded-pill border border-edge text-ink font-semibold mt-4 transition-colors hover:bg-raised"
                     >
                         Réessayer

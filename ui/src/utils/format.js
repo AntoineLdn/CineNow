@@ -3,6 +3,16 @@ export function formatRating(rating) {
     return rating.toFixed(1).replace(".", ",");
 }
 
+// « Greta Lee » -> « GL », pour les pastilles de la distribution.
+export function initials(name) {
+    return name
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((part) => part.charAt(0).toUpperCase())
+        .join("");
+}
+
 // Durée en minutes -> « 1 h 46 ». Renvoie null si le backend ne la connaît pas.
 export function formatDuration(minutes) {
     if (!minutes) return null;
