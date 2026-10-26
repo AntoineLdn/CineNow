@@ -39,8 +39,39 @@ export function postJson(path, body) {
     });
 }
 
+// Formes renvoyées par le backend, déclarées ici parce que c'est le seul endroit
+// qui les lit. Les composants les récupèrent par inférence.
+
+/**
+ * @typedef {object} Weather
+ * @property {number} temp
+ * @property {string} condition
+ * @property {string} period Matin, Après-midi, Soir ou Nuit
+ * @property {string} city
+ */
+
+/**
+ * @typedef {object} Movie
+ * @property {number} id
+ * @property {string} title
+ * @property {string[]} genres
+ * @property {number} rating
+ * @property {string | null} poster_path
+ * @property {string} overview vide quand le film vient du flux MQTT
+ * @property {string | null} release_date
+ */
+
+/**
+ * @typedef {Movie & {
+ *   duration: number | null,
+ *   director: string | null,
+ *   actors: string[]
+ * }} MovieDetails
+ */
+
 // ------------------------------------------------------------------- Météo
 
+/** @returns {Promise<Weather>} */
 export function getWeather() {
     return apiJson("/weather");
 }
@@ -51,10 +82,12 @@ export function sendLocation(lat, lon) {
 
 // ------------------------------------------------------------------- Films
 
+/** @returns {Promise<Record<string, Movie[]>>} films groupés par genre */
 export function getMovies() {
     return apiJson("/movies");
 }
 
+/** @returns {Promise<MovieDetails>} */
 export function getMovieDetails(movieId) {
     return apiJson(`/movie/${movieId}`);
 }
@@ -67,6 +100,10 @@ export function getMovieDetails(movieId) {
 // résultat directement, cette fonction sera la seule à changer.
 const RECOMMENDATION_DELAY_MS = 1000;
 
+/**
+ * @param {string[]} moods
+ * @returns {Promise<Movie[]>}
+ */
 export async function getRecommendations(moods) {
     await postJson("/mood", { moods });
     await new Promise((resolve) => setTimeout(resolve, RECOMMENDATION_DELAY_MS));
