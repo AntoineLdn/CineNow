@@ -145,6 +145,7 @@ function FilmPage() {
                         <ToggleButton
                             active={isLiked(movie.id)}
                             Icon={Heart}
+                            fillWhenActive
                             activeLabel="Tu aimes"
                             idleLabel="J'aime"
                             onClick={() => toggleLike(movie.id)}

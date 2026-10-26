@@ -62,6 +62,7 @@ function FeaturedMovie({ movie }) {
                     <ToggleButton
                         active={isLiked(movie.id)}
                         Icon={Heart}
+                        fillWhenActive
                         activeLabel="Dans mes aimés"
                         idleLabel="J'aime"
                         onClick={() => toggleLike(movie.id)}

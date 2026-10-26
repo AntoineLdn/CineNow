@@ -1,12 +1,26 @@
 import { Link } from "react-router";
-import { Heart, Film } from "lucide-react";
+import { Heart, Eye, Film } from "lucide-react";
 import { posterUrl } from "../../utils/poster";
 import { formatRating } from "../../utils/format";
 import { useUserData } from "../../context/UserDataContext";
 
-function PosterCard({ movie }) {
-    const { isLiked, toggleLike } = useUserData();
-    const liked = isLiked(movie.id);
+// `action` choisit ce que fait le bouton sur l'affiche : aimer, ou retirer des
+// films vus depuis l'onglet correspondant de Ma liste.
+function PosterCard({ movie, action = "like" }) {
+    const { isLiked, isWatched, toggleLike, toggleWatched } = useUserData();
+    const onWatched = action === "watched";
+
+    const active = onWatched ? isWatched(movie.id) : isLiked(movie.id);
+    const Icon = onWatched ? Eye : Heart;
+    const toggle = () => (onWatched ? toggleWatched(movie.id) : toggleLike(movie.id));
+    const label = onWatched
+        ? active
+            ? `Retirer ${movie.title} de mes films vus`
+            : `Marquer ${movie.title} comme vu`
+        : active
+          ? `Retirer ${movie.title} de mes aimés`
+          : `Aimer ${movie.title}`;
+
     const poster = posterUrl(movie.poster_path);
 
     return (
@@ -31,19 +45,17 @@ function PosterCard({ movie }) {
                 </Link>
 
                 <button
-                    onClick={() => toggleLike(movie.id)}
-                    aria-pressed={liked}
-                    aria-label={
-                        liked ? `Retirer ${movie.title} de mes aimés` : `Aimer ${movie.title}`
-                    }
+                    onClick={toggle}
+                    aria-pressed={active}
+                    aria-label={label}
                     className={`absolute top-2 right-2 w-11 h-11 rounded-pill flex items-center justify-center transition-colors ${
-                        liked ? "bg-gold text-on-gold" : "bg-base/70 text-ink hover:bg-base"
+                        active ? "bg-gold text-on-gold" : "bg-base/70 text-ink hover:bg-base"
                     }`}
                 >
-                    <Heart
+                    <Icon
                         size={18}
                         strokeWidth={1.5}
-                        fill={liked ? "currentColor" : "none"}
+                        fill={active && !onWatched ? "currentColor" : "none"}
                         aria-hidden="true"
                     />
                 </button>

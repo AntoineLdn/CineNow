@@ -1,6 +1,9 @@
 // Pastille d'action à deux états, partagée par la fiche film et le film mis en
 // avant : dorée quand l'état est actif, contour sinon.
-function ToggleButton({ active, Icon, activeLabel, idleLabel, onClick }) {
+//
+// `fillWhenActive` est explicite parce que tous les pictogrammes ne supportent
+// pas le remplissage : un cœur plein se lit bien, un œil plein devient une tache.
+function ToggleButton({ active, Icon, activeLabel, idleLabel, onClick, fillWhenActive = false }) {
     return (
         <button
             onClick={onClick}
@@ -13,7 +16,7 @@ function ToggleButton({ active, Icon, activeLabel, idleLabel, onClick }) {
                 <Icon
                     size={18}
                     strokeWidth={1.5}
-                    fill={active ? "currentColor" : "none"}
+                    fill={active && fillWhenActive ? "currentColor" : "none"}
                     aria-hidden="true"
                 />
                 {active ? activeLabel : idleLabel}
