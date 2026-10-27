@@ -50,7 +50,8 @@ Projet de Programmation Répartie - Rust
 **4 services Rust** communiquant via **MQTT (Mosquitto)**
 **Interface hybride** : Tauri + React + Tailwind CSS
 
-![Architecture Ciné-Now](docs/architecture.png)
+Les diagrammes — vue d'ensemble, interface et trajet d'une recommandation —
+sont dans [docs/architecture.md](docs/architecture.md).
 
 ### Choix technologiques
 
