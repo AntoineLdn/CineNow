@@ -92,5 +92,29 @@ export function getMovieDetails(movieId) {
     return apiJson(`/movie/${movieId}`);
 }
 
+// La route refuse plus de 100 ids par appel : on découpe, sinon une liste plus
+// longue partirait en 400.
+const MAX_IDS_PER_REQUEST = 100;
+
+/**
+ * Résout une liste d'identifiants en films. Les ids introuvables sont
+ * simplement absents du résultat.
+ *
+ * @param {number[]} ids
+ * @returns {Promise<Movie[]>}
+ */
+export async function getMoviesByIds(ids) {
+    const chunks = [];
+    for (let start = 0; start < ids.length; start += MAX_IDS_PER_REQUEST) {
+        chunks.push(ids.slice(start, start + MAX_IDS_PER_REQUEST));
+    }
+
+    const pages = await Promise.all(
+        chunks.map((chunk) => apiJson(`/movies/by-ids?ids=${chunk.join(",")}`))
+    );
+
+    return pages.flat();
+}
+
 // La recommandation vit dans auth.js : la route est authentifiée, donc elle
 // passe par fetchAuth comme les autres.
