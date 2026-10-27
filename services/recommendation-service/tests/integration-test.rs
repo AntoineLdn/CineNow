@@ -1,5 +1,12 @@
+use chrono::NaiveDate;
 use recommendation_service::{compute_recommendations, WeatherData};
 use std::collections::HashMap;
+
+// Date de référence : les films du catalogue de test sortent en 2000, donc tous
+// sortis, sauf là où un test en décide autrement.
+fn today() -> NaiveDate {
+    NaiveDate::from_ymd_opt(2026, 6, 15).unwrap()
+}
 
 fn make_movie(id: u32, genres: &[&str], rating: f32) -> shared::Movie {
     shared::Movie {
@@ -10,7 +17,7 @@ fn make_movie(id: u32, genres: &[&str], rating: f32) -> shared::Movie {
         vote_count: 1200,
         poster_path: None,
         overview: String::new(),
-        release_date: None,
+        release_date: Some("2000-01-01".to_string()),
     }
 }
 
@@ -57,7 +64,7 @@ fn test_joy_soleil_comedie_en_tete() {
         period: "Matin".to_string(),
     };
 
-    let result = compute_recommendations(&["joy".to_string()], &weather, &catalog);
+    let result = compute_recommendations(&["joy".to_string()], &weather, &catalog, today());
 
     assert!(!result.is_empty());
     let score_comedie = result
@@ -87,7 +94,7 @@ fn test_angry_orageux_action_en_tete() {
         period: "Soir".to_string(),
     };
 
-    let result = compute_recommendations(&["angry".to_string()], &weather, &catalog);
+    let result = compute_recommendations(&["angry".to_string()], &weather, &catalog, today());
 
     assert!(!result.is_empty());
     let score_action = result
@@ -117,7 +124,7 @@ fn test_multi_genre_booste() {
         period: "Matin".to_string(),
     };
 
-    let result = compute_recommendations(&["joy".to_string()], &weather, &catalog);
+    let result = compute_recommendations(&["joy".to_string()], &weather, &catalog, today());
 
     // Film 2 (comedie + romance) vs film 4 (action seul, hors contexte)
     let score_multi = result
@@ -147,8 +154,12 @@ fn test_multi_humeurs_diversite() {
         period: "Après-midi".to_string(),
     };
 
-    let result =
-        compute_recommendations(&["joy".to_string(), "sad".to_string()], &weather, &catalog);
+    let result = compute_recommendations(
+        &["joy".to_string(), "sad".to_string()],
+        &weather,
+        &catalog,
+        today(),
+    );
 
     let ids: Vec<u32> = result.iter().map(|r| r.id).collect();
     let has_comedie = ids.iter().any(|id| [1, 2].contains(id));
@@ -180,7 +191,7 @@ fn test_max_4_par_genre() {
         period: "Nuit".to_string(),
     };
 
-    let result = compute_recommendations(&["angry".to_string()], &weather, &catalog);
+    let result = compute_recommendations(&["angry".to_string()], &weather, &catalog, today());
 
     let action_count = result.iter().filter(|r| r.id >= 1 && r.id <= 6).count();
     assert!(
@@ -200,6 +211,7 @@ fn test_catalogue_vide() {
             period: "Matin".to_string(),
         },
         &HashMap::new(),
+        today(),
     );
     assert!(result.is_empty());
 }
@@ -213,7 +225,7 @@ fn test_scores_normalises() {
         period: "Matin".to_string(),
     };
 
-    let result = compute_recommendations(&["joy".to_string()], &weather, &catalog);
+    let result = compute_recommendations(&["joy".to_string()], &weather, &catalog, today());
 
     for r in &result {
         assert!(
@@ -243,7 +255,7 @@ fn test_deduplication() {
         period: "Soir".to_string(),
     };
 
-    let result = compute_recommendations(&["angry".to_string()], &weather, &catalog);
+    let result = compute_recommendations(&["angry".to_string()], &weather, &catalog, today());
     let count = result.iter().filter(|r| r.id == 1).count();
     assert_eq!(
         count, 1,
@@ -260,7 +272,7 @@ fn test_humeur_inconnue() {
         period: "Soir".to_string(),
     };
 
-    let result = compute_recommendations(&["inconnu".to_string()], &weather, &catalog);
+    let result = compute_recommendations(&["inconnu".to_string()], &weather, &catalog, today());
 
     assert!(!result.is_empty());
     for r in &result {

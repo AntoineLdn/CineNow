@@ -1,3 +1,4 @@
+use chrono::Utc;
 use dotenvy::dotenv;
 use rumqttc::{AsyncClient, MqttOptions, Packet, QoS};
 use shared::{
@@ -98,8 +99,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             let weather = state_clone.weather.lock().await.clone();
                             let movies = state_clone.movies.lock().await.clone();
 
-                            let recommendations =
-                                compute_recommendations(&request.moods, &weather, &movies);
+                            let recommendations = compute_recommendations(
+                                &request.moods,
+                                &weather,
+                                &movies,
+                                Utc::now().date_naive(),
+                            );
 
                             println!("{} films recommandés", recommendations.len());
 
