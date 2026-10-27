@@ -113,6 +113,45 @@ fn families() -> &'static WeatherFamilies {
     })
 }
 
+/// IDs de genres TMDb → nom normalisé (liste complète des genres TMDb).
+///
+/// Partagé pour que tout film venant de TMDb, qu'il arrive par le catalogue ou
+/// par une récupération à la demande, porte les mêmes libellés.
+const TMDB_GENRE_MAP: &[(u32, &str)] = &[
+    (28, "action"),
+    (12, "aventure"),
+    (16, "animation"),
+    (35, "comedie"),
+    (80, "crime"),
+    (99, "documentaire"),
+    (18, "drame"),
+    (10751, "familial"),
+    (14, "fantastique"),
+    (36, "histoire"),
+    (27, "horreur"),
+    (10402, "musique"),
+    (9648, "mystere"),
+    (10749, "romance"),
+    (878, "science-fiction"),
+    (10770, "tele-film"),
+    (53, "thriller"),
+    (10752, "guerre"),
+    (37, "western"),
+];
+
+/// Convertit des ids de genres TMDb en noms normalisés. Les ids inconnus sont
+/// ignorés.
+pub fn tmdb_genre_ids_to_names(ids: &[u64]) -> Vec<String> {
+    ids.iter()
+        .filter_map(|id| {
+            TMDB_GENRE_MAP
+                .iter()
+                .find(|(tmdb_id, _)| *tmdb_id == *id as u32)
+                .map(|(_, name)| name.to_string())
+        })
+        .collect()
+}
+
 /// Normalise un label de genre TMDb en clé interne minuscule sans accents
 /// "Comédie" -> "comedie", "Science-Fiction" -> "science-fiction"
 pub fn normalize_genre(genre: &str) -> String {

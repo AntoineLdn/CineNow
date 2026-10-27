@@ -1,4 +1,4 @@
-use axum::extract::Path;
+use axum::extract::{Path, Query};
 use axum::{
     extract::{FromRef, State},
     http::{Method, StatusCode},
@@ -20,10 +20,12 @@ use tower_http::cors::{Any, CorsLayer};
 mod auth;
 mod db;
 mod handlers;
+mod movies;
 mod pending;
 
 use auth::AuthUser;
 use handlers::{auth_handlers, user_handlers};
+use movies::parse_ids;
 use pending::PendingRequests;
 
 /// Au-delà, on considère que le recommendation-service ne répondra pas.
@@ -206,6 +208,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Routes existantes
         .route("/weather", get(get_weather))
         .route("/movies", get(get_movies))
+        .route("/movies/by-ids", get(get_movies_by_ids))
         .route("/location", post(post_location))
         .route("/movie/:id", get(get_movie_details))
         // Recommandation : authentifiée, une réponse par requête
@@ -399,18 +402,45 @@ async fn post_recommendations(
         }
     };
 
-    // Reconstituer les films complets depuis le catalogue, dans l'ordre des
-    // scores. Les ids absents du catalogue sont perdus ici : l'étape /movies/by-ids
-    // permettra de les compléter via TMDb.
-    let movies = state.movies.lock().await;
-    let catalog: HashMap<u32, &Movie> = movies.values().flatten().map(|m| (m.id, m)).collect();
+    // Reconstituer les films complets dans l'ordre des scores. Un id que le
+    // catalogue ne connaît pas est complété via TMDb plutôt que perdu.
+    let known = catalog_hits(&state, &movie_ids).await;
+    let tmdb_key = env::var("TMDB_API_KEY").unwrap_or_default();
 
-    Ok(Json(
-        movie_ids
-            .iter()
-            .filter_map(|id| catalog.get(id).map(|movie| (*movie).clone()))
-            .collect(),
-    ))
+    Ok(Json(movies::resolve(known, &movie_ids, &tmdb_key).await))
+}
+
+/// Extrait du catalogue les films demandés. Le verrou est relâché à la sortie,
+/// avant tout appel réseau.
+async fn catalog_hits(state: &AppState, ids: &[u32]) -> HashMap<u32, Movie> {
+    let movies = state.movies.lock().await;
+    let index: HashMap<u32, &Movie> = movies.values().flatten().map(|m| (m.id, m)).collect();
+
+    ids.iter()
+        .filter_map(|id| index.get(id).map(|movie| (*id, (*movie).clone())))
+        .collect()
+}
+
+#[derive(Debug, Deserialize)]
+struct ByIdsQuery {
+    ids: String,
+}
+
+/// `GET /movies/by-ids?ids=1,2,3` — les films demandés, dans cet ordre.
+///
+/// Ceux que le catalogue connaît en sortent directement, les autres sont
+/// récupérés sur TMDb. Les ids introuvables sont simplement absents du
+/// résultat.
+async fn get_movies_by_ids(
+    State(state): State<AppState>,
+    Query(query): Query<ByIdsQuery>,
+) -> Result<Json<Vec<Movie>>, (StatusCode, String)> {
+    let ids = parse_ids(&query.ids).map_err(|e| (StatusCode::BAD_REQUEST, e.message()))?;
+
+    let known = catalog_hits(&state, &ids).await;
+    let tmdb_key = env::var("TMDB_API_KEY").unwrap_or_default();
+
+    Ok(Json(movies::resolve(known, &ids, &tmdb_key).await))
 }
 
 async fn post_location(

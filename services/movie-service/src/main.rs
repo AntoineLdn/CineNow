@@ -20,29 +20,6 @@ const GENRES: &[(&str, u32)] = &[
     ("histoire", 36),
 ];
 
-// IDs TMDb → nom normalisé (liste complète des genres TMDb)
-const TMDB_GENRE_MAP: &[(u32, &str)] = &[
-    (28, "action"),
-    (12, "aventure"),
-    (16, "animation"),
-    (35, "comedie"),
-    (80, "crime"),
-    (99, "documentaire"),
-    (18, "drame"),
-    (10751, "familial"),
-    (14, "fantastique"),
-    (36, "histoire"),
-    (27, "horreur"),
-    (10402, "musique"),
-    (9648, "mystere"),
-    (10749, "romance"),
-    (878, "science-fiction"),
-    (10770, "tele-film"),
-    (53, "thriller"),
-    (10752, "guerre"),
-    (37, "western"),
-];
-
 const PAGES: u32 = 10;
 const MAX_MOVIES: usize = 200;
 
@@ -98,17 +75,6 @@ async fn main() -> Result<()> {
     }
 }
 
-fn tmdb_genre_ids_to_names(ids: &[u64]) -> Vec<String> {
-    ids.iter()
-        .filter_map(|id| {
-            TMDB_GENRE_MAP
-                .iter()
-                .find(|(tmdb_id, _)| *tmdb_id == *id as u32)
-                .map(|(_, name)| name.to_string())
-        })
-        .collect()
-}
-
 fn create_mqtt_client(host: &str, port: u16) -> Client {
     let mut opts = MqttOptions::new("movie-service", host, port);
     opts.set_keep_alive(Duration::from_secs(5));
@@ -154,7 +120,7 @@ async fn fetch_movies_by_genre(api_key: &str, genre_id: u32) -> Result<Vec<share
                     .map(|arr| arr.iter().filter_map(|v| v.as_u64()).collect())
                     .unwrap_or_default();
 
-                let genres = tmdb_genre_ids_to_names(&genre_ids);
+                let genres = shared::tmdb_genre_ids_to_names(&genre_ids);
 
                 Some(shared::MovieLite {
                     id: item["id"].as_u64()? as u32,
