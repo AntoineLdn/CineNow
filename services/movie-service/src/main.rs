@@ -122,11 +122,17 @@ async fn fetch_movies_by_genre(api_key: &str, genre_id: u32) -> Result<Vec<share
 
                 let genres = shared::tmdb_genre_ids_to_names(&genre_ids);
 
+                let vote_count = item["vote_count"].as_u64().unwrap_or(0) as u32;
+
                 Some(shared::MovieLite {
                     id: item["id"].as_u64()? as u32,
                     title: item["title"].as_str()?.to_string(),
                     genres,
-                    rating: item["vote_average"].as_f64()? as f32,
+                    rating: shared::rating_from_votes(
+                        item["vote_average"].as_f64().unwrap_or(0.0),
+                        vote_count,
+                    ),
+                    vote_count,
                     // On ne garde que le suffixe TMDb ; l'UI reconstruit l'URL.
                     poster: item["poster_path"].as_str().map(|p| p.to_string()),
                     release_date: item["release_date"].as_str().map(|d| d.to_string()),

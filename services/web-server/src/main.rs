@@ -9,8 +9,9 @@ use dotenvy::dotenv;
 use rumqttc::{AsyncClient, MqttOptions, Packet, QoS};
 use serde::{Deserialize, Serialize};
 use shared::{
-    is_known_mood, Movie, MovieCatalogLite, RecommendationRequest, RecommendationResponse,
-    MQTT_MAX_PACKET_SIZE, TOPIC_RECOMMENDATION_REQUEST, TOPIC_RECOMMENDATION_RESULT,
+    is_known_mood, rating_from_votes, Movie, MovieCatalogLite, RecommendationRequest,
+    RecommendationResponse, MQTT_MAX_PACKET_SIZE, TOPIC_RECOMMENDATION_REQUEST,
+    TOPIC_RECOMMENDATION_RESULT,
 };
 use sqlx::SqlitePool;
 use std::{collections::HashMap, env, sync::Arc, time::Duration};
@@ -72,7 +73,8 @@ struct MovieDetails {
     id: u32,
     title: String,
     genres: Vec<String>,
-    rating: f32,
+    rating: Option<f32>,
+    vote_count: u32,
     poster_path: Option<String>,
     overview: String,
     release_date: Option<String>,
@@ -144,13 +146,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     } else if msg.topic.starts_with("movies/") {
                         // Binaire (bincode) + DTO allégé, reconstruit en Movie complet.
                         // Le poster reste un suffixe : l'UI ajoute le préfixe TMDb.
-                        if let Ok(catalog) = bincode::deserialize::<MovieCatalogLite>(&msg.payload)
-                        {
-                            let genre = msg.topic.replace("movies/", "");
-                            let movies: Vec<Movie> =
-                                catalog.movies.into_iter().map(|m| m.into_movie()).collect();
-                            movies_clone.lock().await.insert(genre.clone(), movies);
-                            println!("Films mis à jour : {}", genre);
+                        match bincode::deserialize::<MovieCatalogLite>(&msg.payload) {
+                            Ok(catalog) => {
+                                let genre = msg.topic.replace("movies/", "");
+                                let movies: Vec<Movie> =
+                                    catalog.movies.into_iter().map(|m| m.into_movie()).collect();
+                                movies_clone.lock().await.insert(genre.clone(), movies);
+                                println!("Films mis à jour : {}", genre);
+                            }
+                            // Typiquement un movie-service d'une autre version : sans
+                            // ce log, le catalogue resterait vide et les
+                            // recommandations répondraient 503 sans explication.
+                            Err(e) => eprintln!(
+                                "Catalogue illisible sur {} : {} — movie-service est-il à jour ?",
+                                msg.topic, e
+                            ),
                         }
                     } else if msg.topic == TOPIC_RECOMMENDATION_RESULT {
                         // JSON (petit payload : liste d'id). La boucle se borne à
@@ -310,11 +320,14 @@ async fn get_movie_details(Path(id): Path<u32>) -> Json<serde_json::Value> {
         })
         .unwrap_or_default();
 
+    let vote_count = details["vote_count"].as_u64().unwrap_or(0) as u32;
+
     let movie = MovieDetails {
         id,
         title: details["title"].as_str().unwrap_or("").to_string(),
         genres,
-        rating: details["vote_average"].as_f64().unwrap_or(0.0) as f32,
+        rating: rating_from_votes(details["vote_average"].as_f64().unwrap_or(0.0), vote_count),
+        vote_count,
         // Suffixe uniquement : l'UI reconstruit l'URL (cohérent avec la grille).
         poster_path: details["poster_path"].as_str().map(|p| p.to_string()),
         overview: details["overview"].as_str().unwrap_or("").to_string(),

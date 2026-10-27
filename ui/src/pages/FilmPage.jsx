@@ -99,6 +99,7 @@ function FilmPage() {
     const poster = posterUrl(movie.poster_path);
     const year = movie.release_date?.slice(0, 4);
     const duration = formatDuration(movie.duration);
+    const rating = formatRating(movie.rating);
 
     return (
         <div className="p-12 max-w-7xl">
@@ -122,10 +123,17 @@ function FilmPage() {
                         {year && <span>{year}</span>}
                         {duration && <span>{duration}</span>}
                         {movie.director && <span>{movie.director}</span>}
-                        <span className="flex items-center gap-1.5 text-gold font-semibold">
-                            <Star size={15} strokeWidth={1.5} fill="currentColor" aria-hidden="true" />
-                            {formatRating(movie.rating)} sur TMDb
-                        </span>
+                        {rating && (
+                            <span className="flex items-center gap-1.5 text-gold font-semibold">
+                                <Star
+                                    size={15}
+                                    strokeWidth={1.5}
+                                    fill="currentColor"
+                                    aria-hidden="true"
+                                />
+                                {rating} sur TMDb
+                            </span>
+                        )}
                     </p>
 
                     {movie.genres?.length > 0 && (

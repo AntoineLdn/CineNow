@@ -29,6 +29,7 @@ function FeaturedMovie({ movie }) {
 
     const poster = posterUrl(movie.poster_path);
     const duration = formatDuration(details?.duration);
+    const rating = formatRating(movie.rating);
 
     return (
         <article className="bg-surface rounded-surface p-6 flex flex-col md:flex-row gap-7">
@@ -48,10 +49,17 @@ function FeaturedMovie({ movie }) {
                 <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted mt-3">
                     {movie.genres?.length > 0 && <span>{movie.genres.join(", ")}</span>}
                     {duration && <span>{duration}</span>}
-                    <span className="flex items-center gap-1.5 text-gold font-semibold">
-                        <Star size={14} strokeWidth={1.5} fill="currentColor" aria-hidden="true" />
-                        {formatRating(movie.rating)}
-                    </span>
+                    {rating && (
+                        <span className="flex items-center gap-1.5 text-gold font-semibold">
+                            <Star
+                                size={14}
+                                strokeWidth={1.5}
+                                fill="currentColor"
+                                aria-hidden="true"
+                            />
+                            {rating}
+                        </span>
+                    )}
                 </p>
 
                 {details?.overview && (

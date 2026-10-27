@@ -1,5 +1,8 @@
 // Note sur 10, virgule décimale française : 7.8 -> « 7,8 ».
+// Renvoie null quand aucun vote n'étaye la note : l'appelant n'affiche alors
+// rien, plutôt qu'un « 0,0 » trompeur.
 export function formatRating(rating) {
+    if (rating === null || rating === undefined) return null;
     return rating.toFixed(1).replace(".", ",");
 }
 

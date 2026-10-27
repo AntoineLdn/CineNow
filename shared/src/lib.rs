@@ -41,10 +41,21 @@ pub struct Movie {
     pub id: u32,
     pub title: String,
     pub genres: Vec<String>,
-    pub rating: f32,
+    /// `None` quand aucun vote n'étaye la note — voir [`rating_from_votes`].
+    pub rating: Option<f32>,
+    pub vote_count: u32,
     pub poster_path: Option<String>,
     pub overview: String,
     pub release_date: Option<String>,
+}
+
+/// Note TMDb, ou `None` quand aucun vote ne l'étaye.
+///
+/// TMDb renvoie `vote_average = 0` pour un film sans vote, souvent parce qu'il
+/// n'est pas encore sorti : l'afficher tel quel donnerait un « 0,0 » qui se
+/// confond avec une vraie mauvaise note.
+pub fn rating_from_votes(vote_average: f64, vote_count: u32) -> Option<f32> {
+    (vote_count > 0).then_some(vote_average as f32)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -62,7 +73,8 @@ pub struct MovieLite {
     pub id: u32,
     pub title: String,
     pub genres: Vec<String>,
-    pub rating: f32,
+    pub rating: Option<f32>,
+    pub vote_count: u32,
     /// Suffixe TMDb uniquement, ex. "/abc123.jpg" (sans le préfixe d'URL).
     pub poster: Option<String>,
     pub release_date: Option<String>,
@@ -84,6 +96,7 @@ impl MovieLite {
             title: self.title,
             genres: self.genres,
             rating: self.rating,
+            vote_count: self.vote_count,
             poster_path: self.poster,
             overview: String::new(),
             release_date: self.release_date,
@@ -208,8 +221,12 @@ pub fn get_affinities(mood: &str, condition: &str) -> HashMap<String, f32> {
 pub fn compute_affinity_score(movie: &Movie, mood: &str, condition: &str) -> f32 {
     let affinities = get_affinities(mood, condition);
 
+    // Les films sans note sont écartés avant le scoring par
+    // compute_recommendations : ce repli ne sert qu'aux appels directs.
+    let rating = movie.rating.unwrap_or(0.0);
+
     if movie.genres.is_empty() {
-        return movie.rating / 10.0 * 0.4;
+        return rating / 10.0 * 0.4;
     }
 
     let total_affinity: f32 = movie
@@ -222,12 +239,25 @@ pub fn compute_affinity_score(movie: &Movie, mood: &str, condition: &str) -> f32
         .sum::<f32>();
 
     let avg_affinity = total_affinity / movie.genres.len() as f32;
-    (movie.rating / 10.0) * (0.4 + 0.6 * avg_affinity)
+    (rating / 10.0) * (0.4 + 0.6 * avg_affinity)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_rating_absente_sans_vote() {
+        // TMDb renvoie 0 faute de votes : ce n'est pas une note de 0.
+        assert_eq!(rating_from_votes(0.0, 0), None);
+        assert_eq!(rating_from_votes(7.4, 0), None);
+    }
+
+    #[test]
+    fn test_rating_presente_des_un_vote() {
+        assert_eq!(rating_from_votes(10.0, 1), Some(10.0));
+        assert_eq!(rating_from_votes(7.4, 1200), Some(7.4));
+    }
 
     #[test]
     fn test_normalize_genre() {
@@ -276,7 +306,8 @@ mod tests {
             id: 1,
             title: "Test".to_string(),
             genres: vec!["Comédie".to_string()],
-            rating: 8.0,
+            rating: Some(8.0),
+            vote_count: 1200,
             poster_path: None,
             overview: String::new(),
             release_date: None,
@@ -292,7 +323,8 @@ mod tests {
             id: 2,
             title: "Test".to_string(),
             genres: vec!["Horreur".to_string()],
-            rating: 8.0,
+            rating: Some(8.0),
+            vote_count: 1200,
             poster_path: None,
             overview: String::new(),
             release_date: None,
@@ -308,7 +340,8 @@ mod tests {
             id: 3,
             title: "Test".to_string(),
             genres: vec!["Action".to_string(), "Science-Fiction".to_string()],
-            rating: 10.0,
+            rating: Some(10.0),
+            vote_count: 1200,
             poster_path: None,
             overview: String::new(),
             release_date: None,
@@ -325,7 +358,8 @@ mod tests {
             id: 4,
             title: "Test".to_string(),
             genres: vec![],
-            rating: 7.0,
+            rating: Some(7.0),
+            vote_count: 1200,
             poster_path: None,
             overview: String::new(),
             release_date: None,

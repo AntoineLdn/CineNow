@@ -22,6 +22,7 @@ function PosterCard({ movie, action = "like" }) {
           : `Aimer ${movie.title}`;
 
     const poster = posterUrl(movie.poster_path);
+    const rating = formatRating(movie.rating);
 
     return (
         <article>
@@ -67,9 +68,9 @@ function PosterCard({ movie, action = "like" }) {
             </h3>
             <p className="text-xs text-muted mt-1 flex items-center gap-2">
                 <span className="truncate">{movie.genres?.slice(0, 2).join(", ")}</span>
-                <span className="ml-auto text-gold font-semibold shrink-0">
-                    {formatRating(movie.rating)}
-                </span>
+                {rating && (
+                    <span className="ml-auto text-gold font-semibold shrink-0">{rating}</span>
+                )}
             </p>
         </article>
     );

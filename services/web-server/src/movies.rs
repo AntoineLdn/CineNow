@@ -1,4 +1,4 @@
-use shared::{tmdb_genre_ids_to_names, Movie};
+use shared::{rating_from_votes, tmdb_genre_ids_to_names, Movie};
 use std::collections::HashMap;
 use tokio::task::JoinSet;
 
@@ -104,11 +104,14 @@ async fn fetch_from_tmdb(client: &reqwest::Client, tmdb_key: &str, id: u32) -> O
         .map(|genres| genres.iter().filter_map(|g| g["id"].as_u64()).collect())
         .unwrap_or_default();
 
+    let vote_count = payload["vote_count"].as_u64().unwrap_or(0) as u32;
+
     Some(Movie {
         id,
         title: payload["title"].as_str().unwrap_or_default().to_string(),
         genres: tmdb_genre_ids_to_names(&genre_ids),
-        rating: payload["vote_average"].as_f64().unwrap_or(0.0) as f32,
+        rating: rating_from_votes(payload["vote_average"].as_f64().unwrap_or(0.0), vote_count),
+        vote_count,
         poster_path: payload["poster_path"].as_str().map(str::to_string),
         overview: payload["overview"].as_str().unwrap_or_default().to_string(),
         release_date: payload["release_date"].as_str().map(str::to_string),
@@ -185,7 +188,8 @@ mod tests {
             id,
             title: format!("Film {id}"),
             genres: vec!["drame".to_string()],
-            rating: 7.0,
+            rating: Some(7.0),
+            vote_count: 1200,
             poster_path: None,
             overview: String::new(),
             release_date: None,
