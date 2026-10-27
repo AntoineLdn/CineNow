@@ -13,7 +13,7 @@ function moodCount(count) {
 
 function CeSoir() {
     const { weather, failed, locating, locationError, useMyLocation } = useWeather();
-    const { selectedMoods, toggleMood, results, status, recommend } = useRecommendations();
+    const { selectedMoods, toggleMood, results, status, error, recommend } = useRecommendations();
 
     const [greeting, invitation] = greetingLines(weather);
     const [featured, ...others] = results;
@@ -65,7 +65,7 @@ function CeSoir() {
 
             {status === "error" && (
                 <section role="alert" className="bg-surface rounded-surface p-7">
-                    <p className="text-ink">La recommandation n'a pas abouti.</p>
+                    <p className="text-ink">{error}</p>
                     <button
                         onClick={recommend}
                         className="h-pill px-6 rounded-pill border border-edge text-ink font-semibold mt-4 transition-colors hover:bg-raised"

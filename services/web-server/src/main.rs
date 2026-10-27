@@ -1,14 +1,17 @@
-use axum::extract::Path;
+use axum::extract::{Path, Query};
 use axum::{
     extract::{FromRef, State},
-    http::Method,
+    http::{Method, StatusCode},
     routing::{delete, get, post},
     Json, Router,
 };
 use dotenvy::dotenv;
 use rumqttc::{AsyncClient, MqttOptions, Packet, QoS};
 use serde::{Deserialize, Serialize};
-use shared::{Movie, MovieCatalogLite};
+use shared::{
+    is_known_mood, Movie, MovieCatalogLite, RecommendationRequest, RecommendationResponse,
+    MQTT_MAX_PACKET_SIZE, TOPIC_RECOMMENDATION_REQUEST, TOPIC_RECOMMENDATION_RESULT,
+};
 use sqlx::SqlitePool;
 use std::{collections::HashMap, env, sync::Arc, time::Duration};
 use tokio::sync::Mutex;
@@ -17,8 +20,16 @@ use tower_http::cors::{Any, CorsLayer};
 mod auth;
 mod db;
 mod handlers;
+mod movies;
+mod pending;
 
+use auth::AuthUser;
 use handlers::{auth_handlers, user_handlers};
+use movies::parse_ids;
+use pending::PendingRequests;
+
+/// Au-delà, on considère que le recommendation-service ne répondra pas.
+const RECOMMENDATION_TIMEOUT: Duration = Duration::from_secs(5);
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 struct WeatherData {
@@ -34,22 +45,16 @@ struct LocationData {
     lon: f32,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize)]
 struct MoodPayload {
     moods: Vec<String>,
-}
-
-// Ce que le recommendation-service publie
-#[derive(Debug, Deserialize)]
-struct RecommendedMovie {
-    id: u32,
 }
 
 #[derive(Clone)]
 struct AppState {
     weather: Arc<Mutex<WeatherData>>,
     movies: Arc<Mutex<HashMap<String, Vec<Movie>>>>,
-    recommendations: Arc<Mutex<Vec<Movie>>>,
+    pending: Arc<PendingRequests>,
     mqtt_client: AsyncClient,
     db: SqlitePool,
 }
@@ -112,18 +117,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut mqttoptions = MqttOptions::new("web-server", broker_host, broker_port);
     mqttoptions.set_keep_alive(Duration::from_secs(5));
-    mqttoptions.set_max_packet_size(262144, 262144);
+    mqttoptions.set_max_packet_size(MQTT_MAX_PACKET_SIZE, MQTT_MAX_PACKET_SIZE);
 
     let (client, mut eventloop) = AsyncClient::new(mqttoptions, 20);
 
     let weather_state = Arc::new(Mutex::new(WeatherData::default()));
     let movies_state: Arc<Mutex<HashMap<String, Vec<Movie>>>> =
         Arc::new(Mutex::new(HashMap::new()));
-    let recommendations_state: Arc<Mutex<Vec<Movie>>> = Arc::new(Mutex::new(Vec::new()));
+    let pending_state = Arc::new(PendingRequests::default());
 
     let weather_clone = weather_state.clone();
     let movies_clone = movies_state.clone();
-    let recommendations_clone = recommendations_state.clone();
+    let pending_clone = pending_state.clone();
 
     // Spawn l'eventloop EN PREMIER
     tokio::spawn(async move {
@@ -147,24 +152,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             movies_clone.lock().await.insert(genre.clone(), movies);
                             println!("Films mis à jour : {}", genre);
                         }
-                    } else if msg.topic == "recommendations/result" {
-                        // JSON (petit payload : liste d'id)
-                        if let Ok(reco) =
-                            serde_json::from_slice::<Vec<RecommendedMovie>>(&msg.payload)
+                    } else if msg.topic == TOPIC_RECOMMENDATION_RESULT {
+                        // JSON (petit payload : liste d'id). La boucle se borne à
+                        // réveiller le handler en attente ; c'est lui qui
+                        // reconstruit les films, sans tenir le verrou ici.
+                        if let Ok(response) =
+                            serde_json::from_slice::<RecommendationResponse>(&msg.payload)
                         {
-                            // Reconstituer les films complets depuis la HashMap movies
-                            let movies = movies_clone.lock().await;
-                            let all_movies: HashMap<u32, &Movie> =
-                                movies.values().flatten().map(|m| (m.id, m)).collect();
-
-                            // Respecter l'ordre des scores
-                            let result: Vec<Movie> = reco
-                                .iter()
-                                .filter_map(|r| all_movies.get(&r.id).map(|m| (*m).clone()))
-                                .collect();
-
-                            println!("Recommandations reçues : {} films", result.len());
-                            *recommendations_clone.lock().await = result;
+                            let count = response.movie_ids.len();
+                            if pending_clone.resolve(response.request_id, response.movie_ids) {
+                                println!(
+                                    "Recommandations reçues (requête {}) : {} films",
+                                    response.request_id, count
+                                );
+                            } else {
+                                println!(
+                                    "Réponse ignorée (requête {} inconnue ou déjà traitée)",
+                                    response.request_id
+                                );
+                            }
                         }
                     }
                 }
@@ -179,7 +185,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .subscribe("weather/current", QoS::AtLeastOnce)
         .await?;
     client
-        .subscribe("recommendations/result", QoS::AtLeastOnce)
+        .subscribe(TOPIC_RECOMMENDATION_RESULT, QoS::AtLeastOnce)
         .await?;
     for topic in MOVIE_TOPICS {
         client.subscribe(*topic, QoS::AtLeastOnce).await?;
@@ -188,7 +194,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let app_state = AppState {
         weather: weather_state,
         movies: movies_state,
-        recommendations: recommendations_state,
+        pending: pending_state,
         mqtt_client: client,
         db,
     };
@@ -202,10 +208,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Routes existantes
         .route("/weather", get(get_weather))
         .route("/movies", get(get_movies))
-        .route("/recommendations", get(get_recommendations))
+        .route("/movies/by-ids", get(get_movies_by_ids))
         .route("/location", post(post_location))
-        .route("/mood", post(post_mood))
         .route("/movie/:id", get(get_movie_details))
+        // Recommandation : authentifiée, une réponse par requête
+        .route("/recommendations", post(post_recommendations))
         // Authentification
         .route("/auth/register", post(auth_handlers::register))
         .route("/auth/login", post(auth_handlers::login))
@@ -320,22 +327,120 @@ async fn get_movie_details(Path(id): Path<u32>) -> Json<serde_json::Value> {
     Json(serde_json::to_value(movie).unwrap_or_default())
 }
 
-async fn get_recommendations(State(state): State<AppState>) -> Json<Vec<Movie>> {
-    Json(state.recommendations.lock().await.clone())
+/// Demande une recommandation et attend sa réponse.
+///
+/// `AuthUser` n'est pas encore lu : la route est authentifiée pour qu'un compte
+/// ne puisse pas recevoir le calcul d'un autre, et le profil n'entrera dans le
+/// calcul qu'avec les préférences utilisateur (Partie B).
+async fn post_recommendations(
+    State(state): State<AppState>,
+    _user: AuthUser,
+    Json(payload): Json<MoodPayload>,
+) -> Result<Json<Vec<Movie>>, (StatusCode, String)> {
+    if payload.moods.is_empty() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "Aucune humeur sélectionnée".to_string(),
+        ));
+    }
+
+    if let Some(unknown) = payload.moods.iter().find(|mood| !is_known_mood(mood)) {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            format!("Humeur inconnue : {unknown}"),
+        ));
+    }
+
+    // Sans catalogue, la réponse ne pourrait être que vide : autant le dire tout
+    // de suite plutôt que d'attendre le timeout.
+    if state.movies.lock().await.is_empty() {
+        return Err((
+            StatusCode::SERVICE_UNAVAILABLE,
+            "Catalogue pas encore reçu, réessaie dans un instant".to_string(),
+        ));
+    }
+
+    let (request_id, receiver) = state.pending.register();
+    let request = RecommendationRequest {
+        request_id,
+        moods: payload.moods,
+    };
+
+    let published = match serde_json::to_string(&request) {
+        Ok(json) => state
+            .mqtt_client
+            .publish(TOPIC_RECOMMENDATION_REQUEST, QoS::AtLeastOnce, false, json)
+            .await
+            .is_ok(),
+        Err(_) => false,
+    };
+
+    if !published {
+        state.pending.forget(request_id);
+        return Err((
+            StatusCode::BAD_GATEWAY,
+            "Demande de recommandation non transmise".to_string(),
+        ));
+    }
+
+    let movie_ids = match tokio::time::timeout(RECOMMENDATION_TIMEOUT, receiver).await {
+        Ok(Ok(movie_ids)) => movie_ids,
+        // Sender relâché sans réponse : ne devrait pas arriver, mais on ne veut
+        // pas attendre pour rien.
+        Ok(Err(_)) => {
+            return Err((
+                StatusCode::BAD_GATEWAY,
+                "Réponse de recommandation perdue".to_string(),
+            ))
+        }
+        Err(_) => {
+            state.pending.forget(request_id);
+            return Err((
+                StatusCode::GATEWAY_TIMEOUT,
+                "Le calcul a pris trop de temps".to_string(),
+            ));
+        }
+    };
+
+    // Reconstituer les films complets dans l'ordre des scores. Un id que le
+    // catalogue ne connaît pas est complété via TMDb plutôt que perdu.
+    let known = catalog_hits(&state, &movie_ids).await;
+    let tmdb_key = env::var("TMDB_API_KEY").unwrap_or_default();
+
+    Ok(Json(movies::resolve(known, &movie_ids, &tmdb_key).await))
 }
 
-async fn post_mood(
+/// Extrait du catalogue les films demandés. Le verrou est relâché à la sortie,
+/// avant tout appel réseau.
+async fn catalog_hits(state: &AppState, ids: &[u32]) -> HashMap<u32, Movie> {
+    let movies = state.movies.lock().await;
+    let index: HashMap<u32, &Movie> = movies.values().flatten().map(|m| (m.id, m)).collect();
+
+    ids.iter()
+        .filter_map(|id| index.get(id).map(|movie| (*id, (*movie).clone())))
+        .collect()
+}
+
+#[derive(Debug, Deserialize)]
+struct ByIdsQuery {
+    ids: String,
+}
+
+/// `GET /movies/by-ids?ids=1,2,3` — les films demandés, dans cet ordre.
+///
+/// Ceux que le catalogue connaît en sortent directement, les autres sont
+/// récupérés sur TMDb. Les ids introuvables sont simplement absents du
+/// résultat.
+async fn get_movies_by_ids(
     State(state): State<AppState>,
-    Json(payload): Json<MoodPayload>,
-) -> Json<serde_json::Value> {
-    println!("Humeur reçue : {:?}", payload.moods);
-    if let Ok(mqtt_msg) = serde_json::to_string(&payload) {
-        let _ = state
-            .mqtt_client
-            .publish("mood/selected", QoS::AtLeastOnce, false, mqtt_msg)
-            .await;
-    }
-    Json(serde_json::json!({ "status": "success" }))
+    Query(query): Query<ByIdsQuery>,
+) -> Result<Json<Vec<Movie>>, (StatusCode, String)> {
+    let ids = parse_ids(&query.ids).map_err(|e| (StatusCode::BAD_REQUEST, e.message()))?;
+
+    let known = catalog_hits(&state, &ids).await;
+    let tmdb_key = env::var("TMDB_API_KEY").unwrap_or_default();
+
+    Ok(Json(movies::resolve(known, &ids, &tmdb_key).await))
 }
 
 async fn post_location(

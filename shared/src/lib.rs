@@ -2,6 +2,40 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::OnceLock;
 
+/// Taille maximale des paquets MQTT, entrants et sortants, pour tous les
+/// services. Fait sauter la limite par défaut de rumqttc (~10 Ko) : les
+/// catalogues de films dépassent largement.
+///
+/// Le broker doit autoriser au moins autant — voir `max_packet_size` dans
+/// docker/mosquitto.conf, qui répète la valeur faute de pouvoir la partager.
+pub const MQTT_MAX_PACKET_SIZE: usize = 262_144;
+
+/// Topics de l'échange requête / réponse des recommandations. Partagés pour que
+/// les deux services ne puissent pas diverger sur une faute de frappe.
+pub const TOPIC_RECOMMENDATION_REQUEST: &str = "recommendations/request";
+pub const TOPIC_RECOMMENDATION_RESULT: &str = "recommendations/result";
+
+/// Demande de recommandation, publiée par le web-server.
+///
+/// `request_id` corrèle la réponse à la requête : sans lui, deux demandes
+/// simultanées se mélangent.
+///
+/// Volontairement sans `deny_unknown_fields` : serde ignore les champs qu'il ne
+/// connaît pas, ce qui permettra d'ajouter les préférences utilisateur sans
+/// casser un service qui ne les lit pas encore.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecommendationRequest {
+    pub request_id: u64,
+    pub moods: Vec<String>,
+}
+
+/// Réponse du recommendation-service, dans l'ordre des scores décroissants.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecommendationResponse {
+    pub request_id: u64,
+    pub movie_ids: Vec<u32>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Movie {
     pub id: u32,
@@ -79,6 +113,45 @@ fn families() -> &'static WeatherFamilies {
     })
 }
 
+/// IDs de genres TMDb → nom normalisé (liste complète des genres TMDb).
+///
+/// Partagé pour que tout film venant de TMDb, qu'il arrive par le catalogue ou
+/// par une récupération à la demande, porte les mêmes libellés.
+const TMDB_GENRE_MAP: &[(u32, &str)] = &[
+    (28, "action"),
+    (12, "aventure"),
+    (16, "animation"),
+    (35, "comedie"),
+    (80, "crime"),
+    (99, "documentaire"),
+    (18, "drame"),
+    (10751, "familial"),
+    (14, "fantastique"),
+    (36, "histoire"),
+    (27, "horreur"),
+    (10402, "musique"),
+    (9648, "mystere"),
+    (10749, "romance"),
+    (878, "science-fiction"),
+    (10770, "tele-film"),
+    (53, "thriller"),
+    (10752, "guerre"),
+    (37, "western"),
+];
+
+/// Convertit des ids de genres TMDb en noms normalisés. Les ids inconnus sont
+/// ignorés.
+pub fn tmdb_genre_ids_to_names(ids: &[u64]) -> Vec<String> {
+    ids.iter()
+        .filter_map(|id| {
+            TMDB_GENRE_MAP
+                .iter()
+                .find(|(tmdb_id, _)| *tmdb_id == *id as u32)
+                .map(|(_, name)| name.to_string())
+        })
+        .collect()
+}
+
 /// Normalise un label de genre TMDb en clé interne minuscule sans accents
 /// "Comédie" -> "comedie", "Science-Fiction" -> "science-fiction"
 pub fn normalize_genre(genre: &str) -> String {
@@ -91,6 +164,16 @@ pub fn normalize_genre(genre: &str) -> String {
         .replace(['î', 'ï'], "i")
         .replace('ç', "c")
         .replace("histoire/biopic", "histoire")
+}
+
+/// Vrai si l'humeur est demandable, c'est-à-dire si elle a sa propre section
+/// dans la matrice. `unknown` en est exclue : c'est la section de repli, pas une
+/// humeur que le client peut choisir.
+///
+/// La liste des humeurs valides reste ainsi dans affinities.toml, sans copie
+/// dans le code.
+pub fn is_known_mood(mood: &str) -> bool {
+    mood != "unknown" && matrix().contains_key(mood)
 }
 
 /// Retourne la matrice d'affinité pour un contexte humeur + météo.

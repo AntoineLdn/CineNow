@@ -92,20 +92,29 @@ export function getMovieDetails(movieId) {
     return apiJson(`/movie/${movieId}`);
 }
 
-// --------------------------------------------------------- Recommandations
-
-// Le serveur ne répond pas la recommandation : il la publie sur MQTT, et le
-// résultat n'apparaît sur /recommendations qu'une fois le calcul fait. D'où
-// cette attente, seul endroit où elle vit — quand le backend renverra le
-// résultat directement, cette fonction sera la seule à changer.
-const RECOMMENDATION_DELAY_MS = 1000;
+// La route refuse plus de 100 ids par appel : on découpe, sinon une liste plus
+// longue partirait en 400.
+const MAX_IDS_PER_REQUEST = 100;
 
 /**
- * @param {string[]} moods
+ * Résout une liste d'identifiants en films. Les ids introuvables sont
+ * simplement absents du résultat.
+ *
+ * @param {number[]} ids
  * @returns {Promise<Movie[]>}
  */
-export async function getRecommendations(moods) {
-    await postJson("/mood", { moods });
-    await new Promise((resolve) => setTimeout(resolve, RECOMMENDATION_DELAY_MS));
-    return apiJson("/recommendations");
+export async function getMoviesByIds(ids) {
+    const chunks = [];
+    for (let start = 0; start < ids.length; start += MAX_IDS_PER_REQUEST) {
+        chunks.push(ids.slice(start, start + MAX_IDS_PER_REQUEST));
+    }
+
+    const pages = await Promise.all(
+        chunks.map((chunk) => apiJson(`/movies/by-ids?ids=${chunk.join(",")}`))
+    );
+
+    return pages.flat();
 }
+
+// La recommandation vit dans auth.js : la route est authentifiée, donc elle
+// passe par fetchAuth comme les autres.

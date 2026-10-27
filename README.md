@@ -50,7 +50,8 @@ Projet de Programmation Répartie - Rust
 **4 services Rust** communiquant via **MQTT (Mosquitto)**
 **Interface hybride** : Tauri + React + Tailwind CSS
 
-![Architecture Ciné-Now](docs/architecture.png)
+Les diagrammes — vue d'ensemble, interface et trajet d'une recommandation —
+sont dans [docs/architecture.md](docs/architecture.md).
 
 ### Choix technologiques
 
@@ -78,19 +79,25 @@ d'un exécutable natif.
 | `weather/current` | weather-service | web-server, recommendation-service | JSON | Météo actuelle |
 | `weather/location` | web-server | weather-service | JSON | Coordonnées GPS |
 | `movies/{genre}` | movie-service | web-server, recommendation-service | bincode | Catalogue par genre |
-| `mood/selected` | web-server | recommendation-service | JSON | Humeurs sélectionnées |
-| `recommendations/result` | recommendation-service | web-server | JSON | IDs + scores recommandés |
+| `recommendations/request` | web-server | recommendation-service | JSON | Humeurs + `request_id` |
+| `recommendations/result` | recommendation-service | web-server | JSON | IDs recommandés + `request_id` |
+
+Les deux topics de recommandation portent un `request_id` qui corrèle la réponse
+à sa requête : sans lui, deux demandes simultanées se mélangeraient.
 
 ### Routes HTTP (web-server, port 3001)
 
-| Méthode | Route | Description |
-|---|---|---|
-| GET | `/weather` | Météo actuelle |
-| GET | `/movies` | Catalogue complet par genre |
-| GET | `/recommendations` | Films recommandés |
-| GET | `/movie/:id` | Détails complets d'un film (fetch TMDb à la demande) |
-| POST | `/mood` | Envoyer les humeurs sélectionnées |
-| POST | `/location` | Envoyer les coordonnées GPS |
+| Méthode | Route | Auth | Description |
+|---|---|---|---|
+| GET | `/weather` | — | Météo actuelle |
+| GET | `/movies` | — | Catalogue complet par genre |
+| GET | `/movies/by-ids?ids=1,2,3` | — | Films demandés, dans cet ordre |
+| GET | `/movie/:id` | — | Détails complets d'un film (fetch TMDb à la demande) |
+| POST | `/location` | — | Envoyer les coordonnées GPS |
+| POST | `/recommendations` | token | Demander une recommandation et attendre son résultat |
+
+Les routes de l'espace utilisateur (`/auth/*`, `/me/*`) et le détail des codes de
+retour sont dans [docs/api-user-space.md](docs/api-user-space.md).
 
 ---
 
