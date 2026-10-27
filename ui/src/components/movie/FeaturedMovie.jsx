@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import { Heart, Eye, Star, Film } from "lucide-react";
 import { posterUrl } from "../../utils/poster";
-import { formatRating, formatDuration } from "../../utils/format";
+import { formatRating, formatDuration, isUpcoming } from "../../utils/format";
 import { useUserData } from "../../context/UserDataContext";
 import { getMovieDetails } from "../../api/client";
 import ToggleButton from "../ui/ToggleButton";
@@ -30,6 +30,7 @@ function FeaturedMovie({ movie }) {
     const poster = posterUrl(movie.poster_path);
     const duration = formatDuration(details?.duration);
     const rating = formatRating(movie.rating);
+    const showsNoRating = !rating && !isUpcoming(movie.release_date);
 
     return (
         <article className="bg-surface rounded-surface p-6 flex flex-col md:flex-row gap-7">
@@ -60,6 +61,7 @@ function FeaturedMovie({ movie }) {
                             {rating}
                         </span>
                     )}
+                    {showsNoRating && <span>Aucune note</span>}
                 </p>
 
                 {details?.overview && (

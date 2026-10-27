@@ -221,7 +221,7 @@ pub fn get_affinities(mood: &str, condition: &str) -> HashMap<String, f32> {
 pub fn compute_affinity_score(movie: &Movie, mood: &str, condition: &str) -> f32 {
     let affinities = get_affinities(mood, condition);
 
-    // Les films sans note sont écartés avant le scoring par
+    // Les films Aucune note sont écartés avant le scoring par
     // compute_recommendations : ce repli ne sert qu'aux appels directs.
     let rating = movie.rating.unwrap_or(0.0);
 

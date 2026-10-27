@@ -1,9 +1,20 @@
 // Note sur 10, virgule décimale française : 7.8 -> « 7,8 ».
-// Renvoie null quand aucun vote n'étaye la note : l'appelant n'affiche alors
-// rien, plutôt qu'un « 0,0 » trompeur.
+// Renvoie null quand aucun vote n'étaye la note : l'appelant affiche alors
+// « Aucune note », plutôt qu'un « 0,0 » trompeur.
 export function formatRating(rating) {
     if (rating === null || rating === undefined) return null;
     return rating.toFixed(1).replace(".", ",");
+}
+
+// Film pas encore sorti. Exige une date : sans elle on ne peut rien affirmer,
+// et surtout rien afficher (le badge annonce « Sortie le … »).
+//
+// Volontairement différent de la règle d'exclusion côté serveur, qui écarte de
+// la recommandation un film dont la date manque : là-bas on refuse de
+// recommander sans preuve, ici on refuse d'annoncer sans date.
+export function isUpcoming(releaseDate) {
+    if (!releaseDate) return false;
+    return releaseDate > new Date().toISOString().slice(0, 10);
 }
 
 // « Greta Lee » -> « GL », pour les pastilles de la distribution.

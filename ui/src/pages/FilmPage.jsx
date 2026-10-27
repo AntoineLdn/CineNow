@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate, useParams } from "react-router";
 import { ChevronLeft, Heart, Eye, Star, Film } from "lucide-react";
 import { getMovieDetails } from "../api/client";
 import { posterUrl } from "../utils/poster";
-import { formatRating, formatDuration, initials } from "../utils/format";
+import { formatRating, formatDuration, initials, isUpcoming } from "../utils/format";
 import { useUserData } from "../context/UserDataContext";
 import ToggleButton from "../components/ui/ToggleButton";
 
@@ -100,6 +100,7 @@ function FilmPage() {
     const year = movie.release_date?.slice(0, 4);
     const duration = formatDuration(movie.duration);
     const rating = formatRating(movie.rating);
+    const showsNoRating = !rating && !isUpcoming(movie.release_date);
 
     return (
         <div className="p-12 max-w-7xl">
@@ -134,6 +135,7 @@ function FilmPage() {
                                 {rating} sur TMDb
                             </span>
                         )}
+                        {showsNoRating && <span>Aucune note sur TMDb</span>}
                     </p>
 
                     {movie.genres?.length > 0 && (

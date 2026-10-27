@@ -1,7 +1,7 @@
 import { Link } from "react-router";
 import { Heart, Eye, Film } from "lucide-react";
 import { posterUrl } from "../../utils/poster";
-import { formatRating } from "../../utils/format";
+import { formatRating, isUpcoming } from "../../utils/format";
 import { useUserData } from "../../context/UserDataContext";
 
 // `action` choisit ce que fait le bouton sur l'affiche : aimer, ou retirer des
@@ -23,6 +23,8 @@ function PosterCard({ movie, action = "like" }) {
 
     const poster = posterUrl(movie.poster_path);
     const rating = formatRating(movie.rating);
+    // Un film à venir n'a pas à être signalé « Aucune note » : c'est normal.
+    const showsNoRating = !rating && !isUpcoming(movie.release_date);
 
     return (
         <article>
@@ -71,6 +73,7 @@ function PosterCard({ movie, action = "like" }) {
                 {rating && (
                     <span className="ml-auto text-gold font-semibold shrink-0">{rating}</span>
                 )}
+                {showsNoRating && <span className="ml-auto shrink-0">Aucune note</span>}
             </p>
         </article>
     );
