@@ -1,4 +1,4 @@
-use shared::{tmdb_genre_ids_to_names, Movie};
+use shared::{rating_from_votes, tmdb_genre_ids_to_names, Movie};
 use std::collections::HashMap;
 use tokio::task::JoinSet;
 
@@ -87,9 +87,63 @@ pub async fn resolve(mut known: HashMap<u32, Movie>, ids: &[u32], tmdb_key: &str
     ids.iter().filter_map(|id| known.remove(id)).collect()
 }
 
+/// Langue demandée à TMDb, puis langues de repli pour les champs traduits.
+///
+/// Beaucoup de films n'ont pas de traduction française : TMDb renvoie alors un
+/// champ vide plutôt qu'une absence, d'où le repli.
+pub const PRIMARY_LANGUAGE: &str = "fr-FR";
+pub const FALLBACK_LANGUAGES: &[&str] = &["en-US"];
+
+/// Fiche TMDb d'un film dans une langue donnée.
+pub async fn fetch_details(
+    client: &reqwest::Client,
+    tmdb_key: &str,
+    movie_id: u32,
+    language: &str,
+) -> Option<serde_json::Value> {
+    let url = format!(
+        "https://api.themoviedb.org/3/movie/{movie_id}?api_key={tmdb_key}&language={language}"
+    );
+    client.get(&url).send().await.ok()?.json().await.ok()
+}
+
+/// Premier texte non vide pour `field`, en essayant les langues dans l'ordre.
+///
+/// `primary` est la réponse déjà en main dans la langue principale : on ne la
+/// redemande pas, et on n'interroge une langue de repli que tant que le champ
+/// reste vide. Générique sur le champ et sur la liste de langues, pour servir
+/// aux autres textes traduits (titre, accroche) le jour venu.
+pub async fn text_with_fallback(
+    client: &reqwest::Client,
+    tmdb_key: &str,
+    movie_id: u32,
+    field: &str,
+    primary: &serde_json::Value,
+    fallbacks: &[&str],
+) -> String {
+    let from_primary = primary[field].as_str().unwrap_or_default();
+    if !from_primary.is_empty() {
+        return from_primary.to_string();
+    }
+
+    for language in fallbacks {
+        let Some(details) = fetch_details(client, tmdb_key, movie_id, language).await else {
+            continue;
+        };
+        let text = details[field].as_str().unwrap_or_default();
+        if !text.is_empty() {
+            return text.to_string();
+        }
+    }
+
+    String::new()
+}
+
 /// Récupère un film sur TMDb. `None` si l'id est inconnu ou l'appel en échec.
 async fn fetch_from_tmdb(client: &reqwest::Client, tmdb_key: &str, id: u32) -> Option<Movie> {
-    let url = format!("https://api.themoviedb.org/3/movie/{id}?api_key={tmdb_key}&language=fr-FR");
+    let url = format!(
+        "https://api.themoviedb.org/3/movie/{id}?api_key={tmdb_key}&language={PRIMARY_LANGUAGE}"
+    );
 
     let payload: serde_json::Value = client.get(&url).send().await.ok()?.json().await.ok()?;
 
@@ -104,11 +158,14 @@ async fn fetch_from_tmdb(client: &reqwest::Client, tmdb_key: &str, id: u32) -> O
         .map(|genres| genres.iter().filter_map(|g| g["id"].as_u64()).collect())
         .unwrap_or_default();
 
+    let vote_count = payload["vote_count"].as_u64().unwrap_or(0) as u32;
+
     Some(Movie {
         id,
         title: payload["title"].as_str().unwrap_or_default().to_string(),
         genres: tmdb_genre_ids_to_names(&genre_ids),
-        rating: payload["vote_average"].as_f64().unwrap_or(0.0) as f32,
+        rating: rating_from_votes(payload["vote_average"].as_f64().unwrap_or(0.0), vote_count),
+        vote_count,
         poster_path: payload["poster_path"].as_str().map(str::to_string),
         overview: payload["overview"].as_str().unwrap_or_default().to_string(),
         release_date: payload["release_date"].as_str().map(str::to_string),
@@ -185,7 +242,8 @@ mod tests {
             id,
             title: format!("Film {id}"),
             genres: vec!["drame".to_string()],
-            rating: 7.0,
+            rating: Some(7.0),
+            vote_count: 1200,
             poster_path: None,
             overview: String::new(),
             release_date: None,

@@ -82,8 +82,24 @@ Corps :
 
 Réponse `200` : la liste des films, dans l'ordre des scores décroissants.
 ```json
-[{ "id": 550, "title": "Fight Club", "genres": ["drame"], "rating": 8.4, "poster_path": "/abc.jpg", "overview": "...", "release_date": "1999-10-15" }]
+[{ "id": 550, "title": "Fight Club", "genres": ["drame"], "rating": 8.4, "vote_count": 30142, "poster_path": "/abc.jpg", "overview": "...", "release_date": "1999-10-15" }]
 ```
+
+Un film n'est proposé que s'il remplit **les trois conditions** suivantes :
+
+| Condition | Pourquoi |
+|---|---|
+| Déjà sorti (`release_date` ≤ aujourd'hui) | « Ce soir » ne doit jamais proposer un film invisible |
+| `rating` non nul | sans note, rien ne permet de le classer |
+| `vote_count` ≥ 50 | un film obscur noté 10/10 sur deux votes passerait devant tout le monde |
+
+Une `release_date` absente ou illisible **exclut** le film : on ne peut pas
+affirmer qu'il est sorti. Le seuil de votes est
+`MIN_VOTES_FOR_RECOMMENDATION` dans `services/recommendation-service/src/lib.rs`.
+
+Ces exclusions ne valent que pour la recommandation : `/movies` et
+`/movies/by-ids` continuent de renvoyer les films à venir, que le catalogue
+affiche avec un badge de sortie.
 
 | Code | Quand |
 |---|---|
@@ -117,6 +133,31 @@ introuvables sont simplement absents du résultat, sans erreur.
 | Code | Quand |
 |---|---|
 | `400` | `ids` absent ou vide, format invalide, ou plus de 100 ids |
+
+---
+
+## Forme d'un film
+
+Toutes les routes qui renvoient des films partagent la même forme.
+
+| Champ | Type | Remarque |
+|---|---|---|
+| `id` | `number` | identifiant TMDb |
+| `title` | `string` | |
+| `genres` | `string[]` | slugs normalisés : `"science-fiction"`, jamais `"Science-Fiction"` |
+| `rating` | `number \| null` | **nul** quand `vote_count` vaut 0 |
+| `vote_count` | `number` | nombre de votes TMDb |
+| `poster_path` | `string \| null` | suffixe seul, l'UI reconstruit l'URL |
+| `overview` | `string` | **vide** quand le film vient du flux MQTT |
+| `release_date` | `string \| null` | `AAAA-MM-JJ` |
+
+`rating` est nul et non zéro parce que TMDb renvoie `vote_average = 0` pour un
+film sans vote — souvent parce qu'il n'est pas encore sorti. Le distinguer d'une
+vraie note de 0 évite d'afficher « 0,0 » sur un film que personne n'a noté :
+l'UI affiche « Aucune note », ou rien du tout si le film n'est pas sorti.
+
+`GET /movie/:id` ajoute `duration`, `director` et `actors`. Son `overview` est
+rempli : quand TMDb n'a pas de traduction française, la route retente en anglais.
 
 ---
 

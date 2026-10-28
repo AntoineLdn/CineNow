@@ -3,7 +3,9 @@ import { Link, useLocation, useNavigate, useParams } from "react-router";
 import { ChevronLeft, Heart, Eye, Star, Film } from "lucide-react";
 import { getMovieDetails } from "../api/client";
 import { posterUrl } from "../utils/poster";
-import { formatRating, formatDuration, initials } from "../utils/format";
+import { formatRating, formatDuration, initials, isUpcoming } from "../utils/format";
+import { genreLabel } from "../data/genres";
+import UpcomingBadge from "../components/movie/UpcomingBadge";
 import { useUserData } from "../context/UserDataContext";
 import ToggleButton from "../components/ui/ToggleButton";
 
@@ -99,6 +101,9 @@ function FilmPage() {
     const poster = posterUrl(movie.poster_path);
     const year = movie.release_date?.slice(0, 4);
     const duration = formatDuration(movie.duration);
+    const rating = formatRating(movie.rating);
+    const upcoming = isUpcoming(movie.release_date);
+    const showsNoRating = !rating && !upcoming;
 
     return (
         <div className="p-12 max-w-7xl">
@@ -122,10 +127,19 @@ function FilmPage() {
                         {year && <span>{year}</span>}
                         {duration && <span>{duration}</span>}
                         {movie.director && <span>{movie.director}</span>}
-                        <span className="flex items-center gap-1.5 text-gold font-semibold">
-                            <Star size={15} strokeWidth={1.5} fill="currentColor" aria-hidden="true" />
-                            {formatRating(movie.rating)} sur TMDb
-                        </span>
+                        {rating && (
+                            <span className="flex items-center gap-1.5 text-gold font-semibold">
+                                <Star
+                                    size={15}
+                                    strokeWidth={1.5}
+                                    fill="currentColor"
+                                    aria-hidden="true"
+                                />
+                                {rating} sur TMDb
+                            </span>
+                        )}
+                        {showsNoRating && <span>Aucune note sur TMDb</span>}
+                        {upcoming && <UpcomingBadge releaseDate={movie.release_date} />}
                     </p>
 
                     {movie.genres?.length > 0 && (
@@ -135,7 +149,7 @@ function FilmPage() {
                                     key={genre}
                                     className="px-4 py-1.5 rounded-pill bg-raised text-sm text-ink"
                                 >
-                                    {genre}
+                                    {genreLabel(genre)}
                                 </li>
                             ))}
                         </ul>

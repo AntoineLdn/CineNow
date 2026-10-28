@@ -1,7 +1,9 @@
 import { Link } from "react-router";
 import { Heart, Eye, Film } from "lucide-react";
 import { posterUrl } from "../../utils/poster";
-import { formatRating } from "../../utils/format";
+import { formatRating, isUpcoming } from "../../utils/format";
+import { genreLabels } from "../../data/genres";
+import UpcomingBadge from "./UpcomingBadge";
 import { useUserData } from "../../context/UserDataContext";
 
 // `action` choisit ce que fait le bouton sur l'affiche : aimer, ou retirer des
@@ -22,6 +24,11 @@ function PosterCard({ movie, action = "like" }) {
           : `Aimer ${movie.title}`;
 
     const poster = posterUrl(movie.poster_path);
+    const rating = formatRating(movie.rating);
+    const upcoming = isUpcoming(movie.release_date);
+    // Un film à venir n'a pas à être signalé « Aucune note » : c'est normal,
+    // et le badge de sortie le dit déjà.
+    const showsNoRating = !rating && !upcoming;
 
     return (
         <article>
@@ -43,6 +50,13 @@ function PosterCard({ movie, action = "like" }) {
                         </div>
                     )}
                 </Link>
+
+                {upcoming && (
+                    <UpcomingBadge
+                        releaseDate={movie.release_date}
+                        className="absolute top-2 left-2"
+                    />
+                )}
 
                 <button
                     onClick={toggle}
@@ -66,10 +80,13 @@ function PosterCard({ movie, action = "like" }) {
                 {movie.title}
             </h3>
             <p className="text-xs text-muted mt-1 flex items-center gap-2">
-                <span className="truncate">{movie.genres?.slice(0, 2).join(", ")}</span>
-                <span className="ml-auto text-gold font-semibold shrink-0">
-                    {formatRating(movie.rating)}
+                <span className="truncate">
+                    {genreLabels(movie.genres?.slice(0, 2)).join(", ")}
                 </span>
+                {rating && (
+                    <span className="ml-auto text-gold font-semibold shrink-0">{rating}</span>
+                )}
+                {showsNoRating && <span className="ml-auto shrink-0">Aucune note</span>}
             </p>
         </article>
     );

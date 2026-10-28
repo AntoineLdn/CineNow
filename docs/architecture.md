@@ -109,7 +109,8 @@ sequenceDiagram
     WS->>WS: register() → request_id
     WS->>B: recommendations/request { request_id, moods }
     B->>RS: livraison
-    RS->>RS: compute_recommendations(moods, météo, catalogue)
+    RS->>RS: compute_recommendations(moods, météo, catalogue, aujourd'hui)
+    Note over RS: écarte les films pas sortis,<br/>sans note, ou sous 50 votes
     RS->>B: recommendations/result { request_id, movie_ids }
     B->>WS: livraison
     WS->>WS: resolve(request_id) → réveille le handler en attente

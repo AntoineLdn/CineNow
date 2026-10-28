@@ -9,8 +9,9 @@ use dotenvy::dotenv;
 use rumqttc::{AsyncClient, MqttOptions, Packet, QoS};
 use serde::{Deserialize, Serialize};
 use shared::{
-    is_known_mood, Movie, MovieCatalogLite, RecommendationRequest, RecommendationResponse,
-    MQTT_MAX_PACKET_SIZE, TOPIC_RECOMMENDATION_REQUEST, TOPIC_RECOMMENDATION_RESULT,
+    is_known_mood, rating_from_votes, tmdb_genre_ids_to_names, Movie, MovieCatalogLite,
+    RecommendationRequest, RecommendationResponse, MQTT_MAX_PACKET_SIZE,
+    TOPIC_RECOMMENDATION_REQUEST, TOPIC_RECOMMENDATION_RESULT,
 };
 use sqlx::SqlitePool;
 use std::{collections::HashMap, env, sync::Arc, time::Duration};
@@ -72,7 +73,8 @@ struct MovieDetails {
     id: u32,
     title: String,
     genres: Vec<String>,
-    rating: f32,
+    rating: Option<f32>,
+    vote_count: u32,
     poster_path: Option<String>,
     overview: String,
     release_date: Option<String>,
@@ -144,13 +146,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     } else if msg.topic.starts_with("movies/") {
                         // Binaire (bincode) + DTO allégé, reconstruit en Movie complet.
                         // Le poster reste un suffixe : l'UI ajoute le préfixe TMDb.
-                        if let Ok(catalog) = bincode::deserialize::<MovieCatalogLite>(&msg.payload)
-                        {
-                            let genre = msg.topic.replace("movies/", "");
-                            let movies: Vec<Movie> =
-                                catalog.movies.into_iter().map(|m| m.into_movie()).collect();
-                            movies_clone.lock().await.insert(genre.clone(), movies);
-                            println!("Films mis à jour : {}", genre);
+                        match bincode::deserialize::<MovieCatalogLite>(&msg.payload) {
+                            Ok(catalog) => {
+                                let genre = msg.topic.replace("movies/", "");
+                                let movies: Vec<Movie> =
+                                    catalog.movies.into_iter().map(|m| m.into_movie()).collect();
+                                movies_clone.lock().await.insert(genre.clone(), movies);
+                                println!("Films mis à jour : {}", genre);
+                            }
+                            // Typiquement un movie-service d'une autre version : sans
+                            // ce log, le catalogue resterait vide et les
+                            // recommandations répondraient 503 sans explication.
+                            Err(e) => eprintln!(
+                                "Catalogue illisible sur {} : {} — movie-service est-il à jour ?",
+                                msg.topic, e
+                            ),
                         }
                     } else if msg.topic == TOPIC_RECOMMENDATION_RESULT {
                         // JSON (petit payload : liste d'id). La boucle se borne à
@@ -258,12 +268,16 @@ async fn get_movie_details(Path(id): Path<u32>) -> Json<serde_json::Value> {
 
     // Fetch détails + crédits en parallèle
     let details_url = format!(
-        "https://api.themoviedb.org/3/movie/{}?api_key={}&language=fr-FR",
-        id, tmdb_key
+        "https://api.themoviedb.org/3/movie/{}?api_key={}&language={}",
+        id,
+        tmdb_key,
+        movies::PRIMARY_LANGUAGE
     );
     let credits_url = format!(
-        "https://api.themoviedb.org/3/movie/{}/credits?api_key={}&language=fr-FR",
-        id, tmdb_key
+        "https://api.themoviedb.org/3/movie/{}/credits?api_key={}&language={}",
+        id,
+        tmdb_key,
+        movies::PRIMARY_LANGUAGE
     );
 
     let client = reqwest::Client::new();
@@ -300,24 +314,39 @@ async fn get_movie_details(Path(id): Path<u32>) -> Json<serde_json::Value> {
         })
         .unwrap_or_default();
 
-    // Extraire genres
-    let genres: Vec<String> = details["genres"]
+    // Genres convertis depuis leurs ids, comme pour le catalogue : passer par les
+    // noms TMDb donnerait « Science-Fiction » là où le reste de l'app attend
+    // « science-fiction ».
+    let genre_ids: Vec<u64> = details["genres"]
         .as_array()
-        .map(|g| {
-            g.iter()
-                .filter_map(|genre| genre["name"].as_str().map(|s| s.to_string()))
-                .collect()
-        })
+        .map(|genres| genres.iter().filter_map(|g| g["id"].as_u64()).collect())
         .unwrap_or_default();
+
+    let genres = tmdb_genre_ids_to_names(&genre_ids);
+
+    // Le synopsis manque souvent en français : on retombe sur l'anglais, et
+    // seulement dans ce cas (une seconde requête, pas systématique).
+    let overview = movies::text_with_fallback(
+        &client,
+        &tmdb_key,
+        id,
+        "overview",
+        &details,
+        movies::FALLBACK_LANGUAGES,
+    )
+    .await;
+
+    let vote_count = details["vote_count"].as_u64().unwrap_or(0) as u32;
 
     let movie = MovieDetails {
         id,
         title: details["title"].as_str().unwrap_or("").to_string(),
         genres,
-        rating: details["vote_average"].as_f64().unwrap_or(0.0) as f32,
+        rating: rating_from_votes(details["vote_average"].as_f64().unwrap_or(0.0), vote_count),
+        vote_count,
         // Suffixe uniquement : l'UI reconstruit l'URL (cohérent avec la grille).
         poster_path: details["poster_path"].as_str().map(|p| p.to_string()),
-        overview: details["overview"].as_str().unwrap_or("").to_string(),
+        overview,
         release_date: details["release_date"].as_str().map(|s| s.to_string()),
         duration: details["runtime"].as_u64().map(|d| d as u32),
         director,

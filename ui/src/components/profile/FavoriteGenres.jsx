@@ -1,24 +1,5 @@
 import { useUserData } from "../../context/UserDataContext";
-
-// Liste figée plutôt que saisie libre : les identifiants doivent correspondre
-// aux genres normalisés publiés par le movie-service (voir GENRES dans
-// services/movie-service/src/main.rs), sinon un favori ne matcherait aucun film.
-const GENRES = [
-    { id: "action", label: "Action" },
-    { id: "animation", label: "Animation" },
-    { id: "aventure", label: "Aventure" },
-    { id: "comedie", label: "Comédie" },
-    { id: "documentaire", label: "Documentaire" },
-    { id: "drame", label: "Drame" },
-    { id: "familial", label: "Familial" },
-    { id: "fantastique", label: "Fantastique" },
-    { id: "guerre", label: "Guerre" },
-    { id: "histoire", label: "Histoire" },
-    { id: "horreur", label: "Horreur" },
-    { id: "romance", label: "Romance" },
-    { id: "science-fiction", label: "Science-fiction" },
-    { id: "thriller", label: "Thriller" },
-];
+import { SELECTABLE_GENRES, genreLabel } from "../../data/genres";
 
 function countLine(count) {
     if (count === 0) return "Aucun genre ne pèse encore dans tes recommandations.";
@@ -36,12 +17,12 @@ function FavoriteGenres() {
             <p className="text-muted mt-2">{countLine(favoriteGenres.length)}</p>
 
             <div className="flex flex-wrap gap-3 mt-6">
-                {GENRES.map(({ id, label }) => {
-                    const isFavorite = isFavoriteGenre(id);
+                {SELECTABLE_GENRES.map((genre) => {
+                    const isFavorite = isFavoriteGenre(genre);
                     return (
                         <button
-                            key={id}
-                            onClick={() => toggleFavoriteGenre(id)}
+                            key={genre}
+                            onClick={() => toggleFavoriteGenre(genre)}
                             aria-pressed={isFavorite}
                             className={`h-pill px-5 rounded-pill border font-semibold transition-colors ${
                                 isFavorite
@@ -49,7 +30,7 @@ function FavoriteGenres() {
                                     : "border-edge text-ink hover:bg-raised"
                             }`}
                         >
-                            {label}
+                            {genreLabel(genre)}
                         </button>
                     );
                 })}

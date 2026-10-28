@@ -1,3 +1,4 @@
+use chrono::Utc;
 use dotenvy::dotenv;
 use rumqttc::{AsyncClient, MqttOptions, Packet, QoS};
 use shared::{
@@ -71,13 +72,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }
                     } else if msg.topic.starts_with("movies/") {
                         // Binaire (bincode) + DTO allégé, reconstruit en Movie complet
-                        if let Ok(catalog) =
-                            bincode::deserialize::<shared::MovieCatalogLite>(&msg.payload)
-                        {
-                            let genre = msg.topic.replace("movies/", "");
-                            let movies: Vec<shared::Movie> =
-                                catalog.movies.into_iter().map(|m| m.into_movie()).collect();
-                            state_clone.movies.lock().await.insert(genre, movies);
+                        match bincode::deserialize::<shared::MovieCatalogLite>(&msg.payload) {
+                            Ok(catalog) => {
+                                let genre = msg.topic.replace("movies/", "");
+                                let movies: Vec<shared::Movie> =
+                                    catalog.movies.into_iter().map(|m| m.into_movie()).collect();
+                                state_clone.movies.lock().await.insert(genre, movies);
+                            }
+                            // Typiquement un movie-service d'une autre version : sans
+                            // ce log, le service calculerait sur un catalogue vide.
+                            Err(e) => eprintln!(
+                                "Catalogue illisible sur {} : {} — movie-service est-il à jour ?",
+                                msg.topic, e
+                            ),
                         }
                     } else if msg.topic == TOPIC_RECOMMENDATION_REQUEST {
                         // JSON (petit payload)
@@ -92,8 +99,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             let weather = state_clone.weather.lock().await.clone();
                             let movies = state_clone.movies.lock().await.clone();
 
-                            let recommendations =
-                                compute_recommendations(&request.moods, &weather, &movies);
+                            let recommendations = compute_recommendations(
+                                &request.moods,
+                                &weather,
+                                &movies,
+                                Utc::now().date_naive(),
+                            );
 
                             println!("{} films recommandés", recommendations.len());
 
