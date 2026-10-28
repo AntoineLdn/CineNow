@@ -87,9 +87,63 @@ pub async fn resolve(mut known: HashMap<u32, Movie>, ids: &[u32], tmdb_key: &str
     ids.iter().filter_map(|id| known.remove(id)).collect()
 }
 
+/// Langue demandée à TMDb, puis langues de repli pour les champs traduits.
+///
+/// Beaucoup de films n'ont pas de traduction française : TMDb renvoie alors un
+/// champ vide plutôt qu'une absence, d'où le repli.
+pub const PRIMARY_LANGUAGE: &str = "fr-FR";
+pub const FALLBACK_LANGUAGES: &[&str] = &["en-US"];
+
+/// Fiche TMDb d'un film dans une langue donnée.
+pub async fn fetch_details(
+    client: &reqwest::Client,
+    tmdb_key: &str,
+    movie_id: u32,
+    language: &str,
+) -> Option<serde_json::Value> {
+    let url = format!(
+        "https://api.themoviedb.org/3/movie/{movie_id}?api_key={tmdb_key}&language={language}"
+    );
+    client.get(&url).send().await.ok()?.json().await.ok()
+}
+
+/// Premier texte non vide pour `field`, en essayant les langues dans l'ordre.
+///
+/// `primary` est la réponse déjà en main dans la langue principale : on ne la
+/// redemande pas, et on n'interroge une langue de repli que tant que le champ
+/// reste vide. Générique sur le champ et sur la liste de langues, pour servir
+/// aux autres textes traduits (titre, accroche) le jour venu.
+pub async fn text_with_fallback(
+    client: &reqwest::Client,
+    tmdb_key: &str,
+    movie_id: u32,
+    field: &str,
+    primary: &serde_json::Value,
+    fallbacks: &[&str],
+) -> String {
+    let from_primary = primary[field].as_str().unwrap_or_default();
+    if !from_primary.is_empty() {
+        return from_primary.to_string();
+    }
+
+    for language in fallbacks {
+        let Some(details) = fetch_details(client, tmdb_key, movie_id, language).await else {
+            continue;
+        };
+        let text = details[field].as_str().unwrap_or_default();
+        if !text.is_empty() {
+            return text.to_string();
+        }
+    }
+
+    String::new()
+}
+
 /// Récupère un film sur TMDb. `None` si l'id est inconnu ou l'appel en échec.
 async fn fetch_from_tmdb(client: &reqwest::Client, tmdb_key: &str, id: u32) -> Option<Movie> {
-    let url = format!("https://api.themoviedb.org/3/movie/{id}?api_key={tmdb_key}&language=fr-FR");
+    let url = format!(
+        "https://api.themoviedb.org/3/movie/{id}?api_key={tmdb_key}&language={PRIMARY_LANGUAGE}"
+    );
 
     let payload: serde_json::Value = client.get(&url).send().await.ok()?.json().await.ok()?;
 

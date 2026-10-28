@@ -268,12 +268,16 @@ async fn get_movie_details(Path(id): Path<u32>) -> Json<serde_json::Value> {
 
     // Fetch détails + crédits en parallèle
     let details_url = format!(
-        "https://api.themoviedb.org/3/movie/{}?api_key={}&language=fr-FR",
-        id, tmdb_key
+        "https://api.themoviedb.org/3/movie/{}?api_key={}&language={}",
+        id,
+        tmdb_key,
+        movies::PRIMARY_LANGUAGE
     );
     let credits_url = format!(
-        "https://api.themoviedb.org/3/movie/{}/credits?api_key={}&language=fr-FR",
-        id, tmdb_key
+        "https://api.themoviedb.org/3/movie/{}/credits?api_key={}&language={}",
+        id,
+        tmdb_key,
+        movies::PRIMARY_LANGUAGE
     );
 
     let client = reqwest::Client::new();
@@ -320,6 +324,18 @@ async fn get_movie_details(Path(id): Path<u32>) -> Json<serde_json::Value> {
         })
         .unwrap_or_default();
 
+    // Le synopsis manque souvent en français : on retombe sur l'anglais, et
+    // seulement dans ce cas (une seconde requête, pas systématique).
+    let overview = movies::text_with_fallback(
+        &client,
+        &tmdb_key,
+        id,
+        "overview",
+        &details,
+        movies::FALLBACK_LANGUAGES,
+    )
+    .await;
+
     let vote_count = details["vote_count"].as_u64().unwrap_or(0) as u32;
 
     let movie = MovieDetails {
@@ -330,7 +346,7 @@ async fn get_movie_details(Path(id): Path<u32>) -> Json<serde_json::Value> {
         vote_count,
         // Suffixe uniquement : l'UI reconstruit l'URL (cohérent avec la grille).
         poster_path: details["poster_path"].as_str().map(|p| p.to_string()),
-        overview: details["overview"].as_str().unwrap_or("").to_string(),
+        overview,
         release_date: details["release_date"].as_str().map(|s| s.to_string()),
         duration: details["runtime"].as_u64().map(|d| d as u32),
         director,
