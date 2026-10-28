@@ -22,12 +22,16 @@ Projet de Programmation Répartie - Rust
 - Heure de la journée (matin, après-midi, soir, nuit)
 
 **Depuis l'API films (TMDb) :**
-- Titre, synopsis, genres, note, affiche, acteurs, réalisateur, durée, date de sortie
+- Titre, synopsis, genres, note et nombre de votes, affiche, acteurs, réalisateur, durée, date de sortie
+- La note est **nulle** quand le film n'a aucun vote : TMDb renvoie alors `0`, qui
+  se confondrait avec une vraie mauvaise note
 
 ### Traitements réalisés
 
 - Algorithme de scoring : chaque film reçoit un score basé sur `rating × multiplicateur(humeur, météo)`
 - Matrice d'affinité pilotée par des données (fichiers TOML), sans logique codée en dur
+- Exclusions avant scoring : film pas encore sorti, sans note, ou noté par moins
+  de 50 personnes (une note de 10/10 sur deux votes ne doit pas primer)
 - Diversification : maximum 4 films par genre dans le top 20
 - Géocodage inversé des coordonnées GPS en nom de ville
 
