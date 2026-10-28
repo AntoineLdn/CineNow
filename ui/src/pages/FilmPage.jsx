@@ -5,6 +5,7 @@ import { getMovieDetails } from "../api/client";
 import { posterUrl } from "../utils/poster";
 import { formatRating, formatDuration, initials, isUpcoming } from "../utils/format";
 import { genreLabel } from "../data/genres";
+import UpcomingBadge from "../components/movie/UpcomingBadge";
 import { useUserData } from "../context/UserDataContext";
 import ToggleButton from "../components/ui/ToggleButton";
 
@@ -101,7 +102,8 @@ function FilmPage() {
     const year = movie.release_date?.slice(0, 4);
     const duration = formatDuration(movie.duration);
     const rating = formatRating(movie.rating);
-    const showsNoRating = !rating && !isUpcoming(movie.release_date);
+    const upcoming = isUpcoming(movie.release_date);
+    const showsNoRating = !rating && !upcoming;
 
     return (
         <div className="p-12 max-w-7xl">
@@ -137,6 +139,7 @@ function FilmPage() {
                             </span>
                         )}
                         {showsNoRating && <span>Aucune note sur TMDb</span>}
+                        {upcoming && <UpcomingBadge releaseDate={movie.release_date} />}
                     </p>
 
                     {movie.genres?.length > 0 && (

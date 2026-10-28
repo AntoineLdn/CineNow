@@ -3,6 +3,7 @@ import { Heart, Eye, Film } from "lucide-react";
 import { posterUrl } from "../../utils/poster";
 import { formatRating, isUpcoming } from "../../utils/format";
 import { genreLabels } from "../../data/genres";
+import UpcomingBadge from "./UpcomingBadge";
 import { useUserData } from "../../context/UserDataContext";
 
 // `action` choisit ce que fait le bouton sur l'affiche : aimer, ou retirer des
@@ -24,8 +25,10 @@ function PosterCard({ movie, action = "like" }) {
 
     const poster = posterUrl(movie.poster_path);
     const rating = formatRating(movie.rating);
-    // Un film à venir n'a pas à être signalé « Aucune note » : c'est normal.
-    const showsNoRating = !rating && !isUpcoming(movie.release_date);
+    const upcoming = isUpcoming(movie.release_date);
+    // Un film à venir n'a pas à être signalé « Aucune note » : c'est normal,
+    // et le badge de sortie le dit déjà.
+    const showsNoRating = !rating && !upcoming;
 
     return (
         <article>
@@ -47,6 +50,13 @@ function PosterCard({ movie, action = "like" }) {
                         </div>
                     )}
                 </Link>
+
+                {upcoming && (
+                    <UpcomingBadge
+                        releaseDate={movie.release_date}
+                        className="absolute top-2 left-2"
+                    />
+                )}
 
                 <button
                     onClick={toggle}

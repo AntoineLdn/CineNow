@@ -12,9 +12,33 @@ export function formatRating(rating) {
 // Volontairement différent de la règle d'exclusion côté serveur, qui écarte de
 // la recommandation un film dont la date manque : là-bas on refuse de
 // recommander sans preuve, ici on refuse d'annoncer sans date.
+// « 2026-11-12 » -> « 12 nov. ». L'année n'apparaît que si elle diffère de
+// l'année en cours, sinon elle alourdit sans rien lever.
+export function formatReleaseDate(releaseDate) {
+    if (!releaseDate) return null;
+
+    // Sans l'heure, la chaîne est lue comme minuit UTC et peut reculer d'un jour
+    // selon le fuseau.
+    const date = new Date(`${releaseDate}T00:00:00`);
+    if (Number.isNaN(date.getTime())) return null;
+
+    const options = { day: "numeric", month: "short" };
+    if (date.getFullYear() !== new Date().getFullYear()) options.year = "numeric";
+
+    return date.toLocaleDateString("fr-FR", options);
+}
+
 export function isUpcoming(releaseDate) {
     if (!releaseDate) return false;
-    return releaseDate > new Date().toISOString().slice(0, 10);
+
+    // Une date illisible ne doit pas compter comme « à venir » : le badge ne
+    // saurait pas l'afficher, et on masquerait aussi « Aucune note ».
+    const release = new Date(`${releaseDate}T00:00:00`);
+    if (Number.isNaN(release.getTime())) return false;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return release > today;
 }
 
 // « Greta Lee » -> « GL », pour les pastilles de la distribution.
