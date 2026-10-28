@@ -4,6 +4,7 @@ import { ChevronLeft, Heart, Eye, Star, Film } from "lucide-react";
 import { getMovieDetails } from "../api/client";
 import { posterUrl } from "../utils/poster";
 import { formatRating, formatDuration, initials, isUpcoming } from "../utils/format";
+import { genreLabel } from "../data/genres";
 import { useUserData } from "../context/UserDataContext";
 import ToggleButton from "../components/ui/ToggleButton";
 
@@ -145,7 +146,7 @@ function FilmPage() {
                                     key={genre}
                                     className="px-4 py-1.5 rounded-pill bg-raised text-sm text-ink"
                                 >
-                                    {genre}
+                                    {genreLabel(genre)}
                                 </li>
                             ))}
                         </ul>

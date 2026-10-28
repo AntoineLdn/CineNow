@@ -2,6 +2,7 @@ import { Link } from "react-router";
 import { Heart, Eye, Film } from "lucide-react";
 import { posterUrl } from "../../utils/poster";
 import { formatRating, isUpcoming } from "../../utils/format";
+import { genreLabels } from "../../data/genres";
 import { useUserData } from "../../context/UserDataContext";
 
 // `action` choisit ce que fait le bouton sur l'affiche : aimer, ou retirer des
@@ -69,7 +70,9 @@ function PosterCard({ movie, action = "like" }) {
                 {movie.title}
             </h3>
             <p className="text-xs text-muted mt-1 flex items-center gap-2">
-                <span className="truncate">{movie.genres?.slice(0, 2).join(", ")}</span>
+                <span className="truncate">
+                    {genreLabels(movie.genres?.slice(0, 2)).join(", ")}
+                </span>
                 {rating && (
                     <span className="ml-auto text-gold font-semibold shrink-0">{rating}</span>
                 )}

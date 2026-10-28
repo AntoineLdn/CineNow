@@ -3,6 +3,7 @@ import { Link } from "react-router";
 import { Heart, Eye, Star, Film } from "lucide-react";
 import { posterUrl } from "../../utils/poster";
 import { formatRating, formatDuration, isUpcoming } from "../../utils/format";
+import { genreLabels } from "../../data/genres";
 import { useUserData } from "../../context/UserDataContext";
 import { getMovieDetails } from "../../api/client";
 import ToggleButton from "../ui/ToggleButton";
@@ -48,7 +49,9 @@ function FeaturedMovie({ movie }) {
                 <h3 className="font-display text-5xl text-ink leading-none">{movie.title}</h3>
 
                 <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted mt-3">
-                    {movie.genres?.length > 0 && <span>{movie.genres.join(", ")}</span>}
+                    {movie.genres?.length > 0 && (
+                        <span>{genreLabels(movie.genres).join(", ")}</span>
+                    )}
                     {duration && <span>{duration}</span>}
                     {rating && (
                         <span className="flex items-center gap-1.5 text-gold font-semibold">

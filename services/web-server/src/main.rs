@@ -9,9 +9,9 @@ use dotenvy::dotenv;
 use rumqttc::{AsyncClient, MqttOptions, Packet, QoS};
 use serde::{Deserialize, Serialize};
 use shared::{
-    is_known_mood, rating_from_votes, Movie, MovieCatalogLite, RecommendationRequest,
-    RecommendationResponse, MQTT_MAX_PACKET_SIZE, TOPIC_RECOMMENDATION_REQUEST,
-    TOPIC_RECOMMENDATION_RESULT,
+    is_known_mood, rating_from_votes, tmdb_genre_ids_to_names, Movie, MovieCatalogLite,
+    RecommendationRequest, RecommendationResponse, MQTT_MAX_PACKET_SIZE,
+    TOPIC_RECOMMENDATION_REQUEST, TOPIC_RECOMMENDATION_RESULT,
 };
 use sqlx::SqlitePool;
 use std::{collections::HashMap, env, sync::Arc, time::Duration};
@@ -314,15 +314,15 @@ async fn get_movie_details(Path(id): Path<u32>) -> Json<serde_json::Value> {
         })
         .unwrap_or_default();
 
-    // Extraire genres
-    let genres: Vec<String> = details["genres"]
+    // Genres convertis depuis leurs ids, comme pour le catalogue : passer par les
+    // noms TMDb donnerait « Science-Fiction » là où le reste de l'app attend
+    // « science-fiction ».
+    let genre_ids: Vec<u64> = details["genres"]
         .as_array()
-        .map(|g| {
-            g.iter()
-                .filter_map(|genre| genre["name"].as_str().map(|s| s.to_string()))
-                .collect()
-        })
+        .map(|genres| genres.iter().filter_map(|g| g["id"].as_u64()).collect())
         .unwrap_or_default();
+
+    let genres = tmdb_genre_ids_to_names(&genre_ids);
 
     // Le synopsis manque souvent en français : on retombe sur l'anglais, et
     // seulement dans ce cas (une seconde requête, pas systématique).
